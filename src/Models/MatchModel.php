@@ -17,8 +17,8 @@ class MatchModel
     public function saveMatches(array $matches): void
     {
         $stmt = $this->db->prepare("
-            INSERT INTO matches (game_type, team1_name, team2_name, tournament_name, match_time, ai_prediction) 
-            VALUES (:game_type, :team1, :team2, :tournament, :time, :prediction)
+            INSERT INTO matches (game_type, team1_name, team2_name, tournament_name, match_time, match_region, ai_prediction) 
+            VALUES (:game_type, :team1, :team2, :tournament, :time, :region, :prediction)
         ");
 
         foreach ($matches as $match) {
@@ -32,14 +32,26 @@ class MatchModel
                 ':team2' => $match['team2'],
                 ':tournament' => $match['tournament'],
                 ':time' => $match['time'],
+                ':region' => $match['region'] ?? 'Other',
                 ':prediction' => $prediction
             ]);
         }
     }
 
-    public function getAllMatches(): array
+    public function getAllMatches(?string $gameType = null): array
     {
-        $stmt = $this->db->query("SELECT * FROM matches ORDER BY match_time DESC");
+        $sql = "SELECT * FROM matches";
+        $params = [];
+
+        if ($gameType) {
+            $sql .= " WHERE game_type = :game_type";
+            $params[':game_type'] = $gameType;
+        }
+
+        $sql .= " ORDER BY match_time DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 

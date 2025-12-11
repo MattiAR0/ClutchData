@@ -3,7 +3,7 @@
         'name' => 'clutchdata/multigame-stats',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '72cbe6f49c27613c9776e95bb35644b73b78b2b3',
+        'reference' => '3ae8311fcc768df062f83c1e8e2efd7ec5a0d0ab',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         'clutchdata/multigame-stats' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '72cbe6f49c27613c9776e95bb35644b73b78b2b3',
+            'reference' => '3ae8311fcc768df062f83c1e8e2efd7ec5a0d0ab',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

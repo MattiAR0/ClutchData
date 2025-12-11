@@ -17,14 +17,21 @@ class MatchController
         $this->model = new MatchModel();
     }
 
-    public function index()
+    public function index(?string $gameType = null)
     {
         $matches = [];
-        $error = null;
-        $message = null;
+        $error = $_SESSION['error'] ?? null;
+        $message = $_SESSION['message'] ?? null;
+
+        // Pass current filter to view
+        $activeTab = $gameType ?? 'all';
+
+        // Limpiar flash messages una vez leídos
+        unset($_SESSION['error']);
+        unset($_SESSION['message']);
 
         try {
-            $matches = $this->model->getAllMatches();
+            $matches = $this->model->getAllMatches($gameType);
         } catch (Exception $e) {
             $error = "No se pudo conectar a la base de datos o leer partidos: " . $e->getMessage();
         }
@@ -35,11 +42,10 @@ class MatchController
 
     public function scrape()
     {
-        $matches = [];
-        $error = null;
-        $message = null;
-
         try {
+            // Limpiar datos antiguos antes de scrapear
+            $this->model->deleteAllMatches();
+
             // Instanciar Scrapers
             $scrapers = [
                 new ValorantScraper(),
@@ -52,45 +58,29 @@ class MatchController
                 $this->model->saveMatches($data);
             }
 
-            $message = "Scraping completado exitosamente.";
+            $_SESSION['message'] = "Scraping completado exitosamente.";
         } catch (Exception $e) {
-            $error = "Error durante el scraping: " . $e->getMessage();
+            $_SESSION['error'] = "Error durante el scraping: " . $e->getMessage();
         }
 
-        // Recargar datos para mostrar
-        try {
-            $matches = $this->model->getAllMatches();
-        } catch (Exception $e) {
-            // Si ya teníamos un error de scraping, concatenamos o priorizamos
-            if (!$error) {
-                $error = "Error al recargar datos: " . $e->getMessage();
-            }
-        }
-
-        require __DIR__ . '/../../views/home.php';
+        // Redireccionar a la raíz del proyecto (dinámico)
+        $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/';
+        header('Location: ' . $redirectUrl);
+        exit;
     }
 
     public function reset()
     {
-        $matches = [];
-        $error = null;
-        $message = null;
-
         try {
             $this->model->deleteAllMatches();
-            $message = "Base de datos limpiada correctamente.";
+            $_SESSION['message'] = "Base de datos limpiada correctamente.";
         } catch (Exception $e) {
-            $error = "No se pudo limpiar la base de datos: " . $e->getMessage();
+            $_SESSION['error'] = "No se pudo limpiar la base de datos: " . $e->getMessage();
         }
 
-        // Mostrar vista vacía
-        try {
-            $matches = $this->model->getAllMatches();
-        } catch (Exception $e) {
-            if (!$error)
-                $error = $e->getMessage();
-        }
-
-        require __DIR__ . '/../../views/home.php';
+        // Redireccionar a la raíz del proyecto (dinámico)
+        $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/';
+        header('Location: ' . $redirectUrl);
+        exit;
     }
 }

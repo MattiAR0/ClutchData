@@ -17,11 +17,20 @@ try {
     // Continuamos si falla .env (ej. producción real env vars)
 }
 
+// Iniciar Sesión para Flash Messages
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Router Instantiation
 $router = new Router();
 
 // Definir Rutas
 $router->get('/', [MatchController::class, 'index']);
+$router->get('/valorant', fn() => (new MatchController())->index('valorant'));
+$router->get('/lol', fn() => (new MatchController())->index('lol'));
+$router->get('/cs2', fn() => (new MatchController())->index('cs2'));
+
 $router->get('/scrape', [MatchController::class, 'scrape']); // Cambiar a GET para que funcione con enlaces simples
 $router->get('/reset', [MatchController::class, 'reset']); // Nueva ruta reset
 
