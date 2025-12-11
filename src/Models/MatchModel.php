@@ -27,11 +27,11 @@ class MatchModel
             $prediction = $this->calculateAiPrediction($match['team1'], $match['team2']);
 
             $stmt->execute([
-                ':game_type'  => $match['game_type'],
-                ':team1'      => $match['team1'],
-                ':team2'      => $match['team2'],
+                ':game_type' => $match['game_type'],
+                ':team1' => $match['team1'],
+                ':team2' => $match['team2'],
                 ':tournament' => $match['tournament'],
-                ':time'       => $match['time'],
+                ':time' => $match['time'],
                 ':prediction' => $prediction
             ]);
         }
@@ -41,6 +41,11 @@ class MatchModel
     {
         $stmt = $this->db->query("SELECT * FROM matches ORDER BY match_time DESC");
         return $stmt->fetchAll();
+    }
+
+    public function deleteAllMatches(): void
+    {
+        $this->db->exec("TRUNCATE TABLE matches");
     }
 
     private function calculateAiPrediction(string $team1, string $team2): float
