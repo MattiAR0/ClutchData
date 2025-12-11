@@ -4,22 +4,53 @@
 <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-zinc-800 pb-6">
 
     <!-- Game Tabs (Zinc Theme) -->
-    <div class="flex bg-zinc-900 p-1 rounded-sm border border-zinc-800">
-        <?php
-        $tabs = [
-            'all' => 'ALL GAMES',
-            'valorant' => 'VALORANT',
-            'lol' => 'LEAGUE',
-            'cs2' => 'CS2'
-        ];
-        // $activeTab is passed from Controller
-        ?>
-        <?php foreach ($tabs as $key => $label): ?>
-            <a href="<?= $key === 'all' ? '.' : $key ?>"
-                class="px-6 py-2 rounded-sm text-xs font-bold tracking-wider transition-all duration-200 uppercase <?= ($activeTab ?? 'all') === $key ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' ?>">
-                <?= $label ?>
-            </a>
-        <?php endforeach; ?>
+    <div class="flex flex-col gap-4">
+        <!-- Game Tabs (Zinc Theme) -->
+        <div class="flex bg-zinc-900 p-1 rounded-sm border border-zinc-800 self-start">
+            <?php
+            $tabs = [
+                'all' => 'ALL GAMES',
+                'valorant' => 'VALORANT',
+                'lol' => 'LEAGUE',
+                'cs2' => 'CS2'
+            ];
+            // $activeTab is passed from Controller
+            // Preserve region param
+            $currentRegion = $_GET['region'] ?? 'all';
+            $regionParam = $currentRegion !== 'all' ? "?region=$currentRegion" : "";
+            ?>
+            <?php foreach ($tabs as $key => $label): ?>
+                <a href="<?= $key === 'all' ? '.' : $key ?><?= $regionParam ?>"
+                    class="px-6 py-2 rounded-sm text-xs font-bold tracking-wider transition-all duration-200 uppercase <?= ($activeTab ?? 'all') === $key ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' ?>">
+                    <?= $label ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Region Tabs (Sub-filter) -->
+        <div class="flex gap-2">
+            <?php
+            $regions = [
+                'all' => 'ALL REGIONS',
+                'Americas' => 'AMERICAS',
+                'EMEA' => 'EMEA',
+                'Pacific' => 'PACIFIC',
+                'International' => 'INTL',
+                'Other' => 'OTHER'
+            ];
+            $currentBaseUrl = ($activeTab === 'all' || $activeTab === null) ? '.' : $activeTab;
+            ?>
+            <?php foreach ($regions as $key => $label): ?>
+                <?php
+                $isActive = ($activeRegion ?? 'all') === $key;
+                $url = $currentBaseUrl . ($key === 'all' ? '' : "?region=$key");
+                ?>
+                <a href="<?= $url ?>"
+                    class="px-3 py-1.5 rounded-sm text-[10px] font-bold tracking-wider transition-all duration-200 uppercase border <?= $isActive ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800/50' ?>">
+                    <?= $label ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
     </div>
 
     <!-- Actions -->

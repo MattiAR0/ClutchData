@@ -38,14 +38,24 @@ class MatchModel
         }
     }
 
-    public function getAllMatches(?string $gameType = null): array
+    public function getAllMatches(?string $gameType = null, ?string $region = null): array
     {
         $sql = "SELECT * FROM matches";
         $params = [];
+        $conditions = [];
 
         if ($gameType) {
-            $sql .= " WHERE game_type = :game_type";
+            $conditions[] = "game_type = :game_type";
             $params[':game_type'] = $gameType;
+        }
+
+        if ($region && $region !== 'all') {
+            $conditions[] = "match_region = :region";
+            $params[':region'] = $region;
+        }
+
+        if (!empty($conditions)) {
+            $sql .= " WHERE " . implode(" AND ", $conditions);
         }
 
         $sql .= " ORDER BY match_time DESC";

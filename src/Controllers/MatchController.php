@@ -25,13 +25,14 @@ class MatchController
 
         // Pass current filter to view
         $activeTab = $gameType ?? 'all';
+        $activeRegion = $_GET['region'] ?? 'all';
 
         // Limpiar flash messages una vez leídos
         unset($_SESSION['error']);
         unset($_SESSION['message']);
 
         try {
-            $matches = $this->model->getAllMatches($gameType);
+            $matches = $this->model->getAllMatches($gameType, $activeRegion);
         } catch (Exception $e) {
             $error = "No se pudo conectar a la base de datos o leer partidos: " . $e->getMessage();
         }
