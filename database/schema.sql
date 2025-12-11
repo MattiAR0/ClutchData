@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS matches (
     team2_name VARCHAR(255) NOT NULL,
     tournament_name VARCHAR(255),
     match_time DATETIME,
+    match_region VARCHAR(50) DEFAULT 'Other',
     ai_prediction FLOAT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
