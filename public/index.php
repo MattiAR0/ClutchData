@@ -33,6 +33,7 @@ $router->get('/cs2', fn() => (new MatchController())->index('cs2'));
 
 $router->get('/scrape', [MatchController::class, 'scrape']); // Cambiar a GET para que funcione con enlaces simples
 $router->get('/reset', [MatchController::class, 'reset']); // Nueva ruta reset
+$router->get('/match', [MatchController::class, 'show']); // Match details
 
 // Resolver Ruta Actual
 $router->resolve();

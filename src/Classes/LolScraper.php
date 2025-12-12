@@ -51,7 +51,11 @@ class LolScraper extends LiquipediaScraper
                             'tournament' => trim($tournament),
                             'region' => $this->detectRegion($tournament),
                             'time' => $time,
-                            'game_type' => $this->getGameType()
+                            'game_type' => $this->getGameType(),
+                            'team1_score' => $this->extractScore($node, true),
+                            'team2_score' => $this->extractScore($node, false),
+                            'match_status' => $this->detectStatus($node),
+                            'match_url' => $this->extractMatchUrl($node, '/leagueoflegends/Match:')
                         ];
                     }
                 } catch (Exception $e) {
@@ -61,5 +65,44 @@ class LolScraper extends LiquipediaScraper
         }
 
         return $matches;
+    }
+
+    public function scrapeMatchDetails(string $url): array
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        $html = $this->fetch($path);
+
+        if (empty($html)) {
+            return [];
+        }
+
+        $crawler = new Crawler($html);
+        $details = [
+            'maps' => [],
+            'streams' => []
+        ];
+
+        // LoL games
+        $crawler->filter('div.match-history-game')->each(function (Crawler $node) use (&$details) {
+            $header = $node->filter('.match-history-game-header');
+            $mapName = $header->count() ? trim($header->text()) : 'Game';
+
+            // Try to find score or winner
+            $scoreText = $header->count() ? $header->text() : '';
+            $score1 = '-';
+            $score2 = '-';
+
+            if (str_contains(strtolower($scoreText), 'winner')) {
+                $score1 = 'Win'; // Simplification
+            }
+
+            $details['maps'][] = [
+                'name' => $mapName,
+                'score1' => $score1,
+                'score2' => $score2
+            ];
+        });
+
+        return $details;
     }
 }

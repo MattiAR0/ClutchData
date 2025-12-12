@@ -146,8 +146,8 @@ if (!empty($matches)) {
                                     default => 'bg-zinc-500'
                                 };
                                 ?>
-                                <div
-                                    class="group relative bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/80 transition-all duration-300 rounded-sm">
+                                <a href="match?id=<?= $match['id'] ?>"
+                                    class="group relative block bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/80 transition-all duration-300 rounded-sm">
                                     <!-- Game Indicator Strip -->
                                     <div
                                         class="absolute left-0 top-0 bottom-0 w-1 <?= $accentColor ?> rounded-l-sm opacity-50 group-hover:opacity-100 transition-opacity">
@@ -179,7 +179,21 @@ if (!empty($matches)) {
                                                 </h3>
                                             </div>
                                             <div class="text-center w-2/12">
-                                                <span class="text-zinc-700 text-xs tracking-widest font-black">VS</span>
+                                                <?php if (($match['match_status'] ?? 'upcoming') === 'upcoming'): ?>
+                                                    <span class="text-zinc-700 text-xs tracking-widest font-black">VS</span>
+                                                <?php else: ?>
+                                                    <div class="flex flex-col items-center">
+                                                        <span class="text-xl font-black text-white tracking-widest">
+                                                            <?= $match['team1_score'] ?? 0 ?> - <?= $match['team2_score'] ?? 0 ?>
+                                                        </span>
+                                                        <?php if (($match['match_status'] ?? '') === 'live'): ?>
+                                                            <span
+                                                                class="text-[10px] font-bold text-rose-500 uppercase animate-pulse">LIVE</span>
+                                                        <?php else: ?>
+                                                            <span class="text-[10px] font-bold text-zinc-500 uppercase">FINAL</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="w-5/12 text-right">
                                                 <h3 class="font-bold text-lg text-white truncate group-hover:text-indigo-400 transition-colors"
@@ -209,7 +223,7 @@ if (!empty($matches)) {
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </a>
                             <?php endforeach; ?>
                         </div>
                     </div>

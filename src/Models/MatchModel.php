@@ -17,13 +17,17 @@ class MatchModel
     public function saveMatches(array $matches): void
     {
         $stmt = $this->db->prepare("
-            INSERT INTO matches (game_type, team1_name, team2_name, tournament_name, match_time, match_region, ai_prediction) 
-            VALUES (:game_type, :team1, :team2, :tournament, :time, :region, :prediction)
+            INSERT INTO matches (
+                game_type, team1_name, team2_name, tournament_name, match_time, 
+                match_region, team1_score, team2_score, match_status, match_url, ai_prediction
+            ) 
+            VALUES (
+                :game_type, :team1, :team2, :tournament, :time, 
+                :region, :team1_score, :team2_score, :status, :url, :prediction
+            )
         ");
 
         foreach ($matches as $match) {
-            // Predicción "AI": Genera un valor aleatorio entre 0.0 y 100.0
-            // En una app real, esto llamaría a un servicio de ML o usaría estadísticas históricas.
             $prediction = $this->calculateAiPrediction($match['team1'], $match['team2']);
 
             $stmt->execute([
@@ -33,6 +37,10 @@ class MatchModel
                 ':tournament' => $match['tournament'],
                 ':time' => $match['time'],
                 ':region' => $match['region'] ?? 'Other',
+                ':team1_score' => $match['team1_score'] ?? null,
+                ':team2_score' => $match['team2_score'] ?? null,
+                ':status' => $match['match_status'] ?? 'upcoming',
+                ':url' => $match['match_url'] ?? null,
                 ':prediction' => $prediction
             ]);
         }
@@ -63,6 +71,23 @@ class MatchModel
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    public function getMatchById(int $id): ?array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM matches WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    public function updateMatchDetails(int $id, array $details): void
+    {
+        $stmt = $this->db->prepare("UPDATE matches SET match_details = :details WHERE id = :id");
+        $stmt->execute([
+            ':details' => json_encode($details),
+            ':id' => $id
+        ]);
     }
 
     public function deleteAllMatches(): void
