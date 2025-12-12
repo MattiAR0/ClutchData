@@ -27,9 +27,6 @@ abstract class LiquipediaScraper implements ScraperInterface
     abstract public function getGameType(): string;
     abstract public function scrapeMatchDetails(string $url): array;
 
-    /**
-     * Helper to fetch HTML content.
-     */
     protected function fetch(string $uri): string
     {
         try {

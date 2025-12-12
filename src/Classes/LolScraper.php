@@ -67,6 +67,111 @@ class LolScraper extends LiquipediaScraper
         return $matches;
     }
 
+
+
+    protected function extractPlayerStats(Crawler $crawler): array
+    {
+        $rawPlayers = [];
+
+        // LoL Liquipedia stats often in match-history-stats table
+        // Headers: Player, K, D, A, CS, G
+
+        $crawler->filter('table.match-history-stats, table.wikitable')->each(function (Crawler $table) use (&$rawPlayers) {
+            $headers = $table->filter('th')->each(function ($th) {
+                return trim($th->text());
+            });
+
+            $kIndex = -1;
+            $dIndex = -1;
+            $aIndex = -1;
+            $nameIndex = 0;
+            $champIndex = -1;
+
+            foreach ($headers as $i => $h) {
+                $h = strtolower($h);
+                if ($h === 'k')
+                    $kIndex = $i;
+                if ($h === 'd')
+                    $dIndex = $i;
+                if ($h === 'a')
+                    $aIndex = $i;
+                if ($h === 'champion' || $h === '')
+                    $champIndex = $i; // Sometimes champion is an image column without header text
+                if ($h === 'player')
+                    $nameIndex = $i;
+            }
+            // Heuristic for champion column if empty header
+            if ($champIndex === -1 && isset($headers[0]) && $headers[0] === '')
+                $champIndex = 0;
+
+
+            if ($kIndex !== -1 && $dIndex !== -1 && $aIndex !== -1) {
+                $table->filter('tr')->each(function ($tr) use (&$rawPlayers, $kIndex, $dIndex, $aIndex, $nameIndex, $champIndex) {
+                    $tds = $tr->filter('td');
+                    if ($tds->count() > max($kIndex, $dIndex, $aIndex)) {
+                        $nameNode = $tds->eq($nameIndex);
+                        $player = trim($nameNode->text());
+
+                        if (!empty($player) && $player !== 'Total') {
+                            $champion = '';
+                            if ($champIndex !== -1 && $tds->eq($champIndex)->count()) {
+                                $img = $tds->eq($champIndex)->filter('img');
+                                if ($img->count()) {
+                                    $champion = $img->attr('alt') ?? $img->attr('title') ?? '';
+                                }
+                            }
+
+                            $rawPlayers[] = [
+                                'name' => $player,
+                                'kills' => (int) trim($tds->eq($kIndex)->text()),
+                                'deaths' => (int) trim($tds->eq($dIndex)->text()),
+                                'assists' => (int) trim($tds->eq($aIndex)->text()),
+                                'agent' => $champion // Using 'agent' field for champion to keep generic
+                            ];
+                        }
+                    }
+                });
+            }
+        });
+
+        // Aggregate players
+        $aggregated = [];
+        foreach ($rawPlayers as $p) {
+            $name = $p['name'];
+            if (!isset($aggregated[$name])) {
+                $aggregated[$name] = [
+                    'name' => $name,
+                    'kills' => 0,
+                    'deaths' => 0,
+                    'assists' => 0,
+                    'agents' => []
+                ];
+            }
+            $aggregated[$name]['kills'] += $p['kills'];
+            $aggregated[$name]['deaths'] += $p['deaths'];
+            $aggregated[$name]['assists'] += $p['assists'];
+
+            if (!empty($p['agent']) && !in_array($p['agent'], $aggregated[$name]['agents'])) {
+                $aggregated[$name]['agents'][] = $p['agent'];
+            }
+        }
+
+        // Format for output
+        $finalPlayers = [];
+        foreach ($aggregated as $p) {
+            $finalPlayers[] = [
+                'name' => $p['name'],
+                'kills' => $p['kills'],
+                'deaths' => $p['deaths'],
+                'assists' => $p['assists'],
+                'agent' => implode(', ', $p['agents']),
+                'team' => 'Unknown'
+            ];
+        }
+
+        return $finalPlayers;
+    }
+
     public function scrapeMatchDetails(string $url): array
     {
         $path = parse_url($url, PHP_URL_PATH);
@@ -79,7 +184,8 @@ class LolScraper extends LiquipediaScraper
         $crawler = new Crawler($html);
         $details = [
             'maps' => [],
-            'streams' => []
+            'streams' => [],
+            'players' => []
         ];
 
         // LoL games
@@ -102,6 +208,8 @@ class LolScraper extends LiquipediaScraper
                 'score2' => $score2
             ];
         });
+
+        $details['players'] = $this->extractPlayerStats($crawler);
 
         return $details;
     }

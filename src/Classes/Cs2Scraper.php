@@ -67,6 +67,98 @@ class Cs2Scraper extends LiquipediaScraper
         return $matches;
     }
 
+
+
+    protected function extractPlayerStats(Crawler $crawler): array
+    {
+        $rawPlayers = [];
+
+        $crawler->filter('table.wikitable')->each(function (Crawler $table) use (&$rawPlayers) {
+            $headers = $table->filter('th')->each(function ($th) {
+                return trim($th->text());
+            });
+
+            $isStatsTable = false;
+            $kIndex = -1;
+            $dIndex = -1;
+            $aIndex = -1;
+            $nameIndex = 0;
+
+            foreach ($headers as $i => $h) {
+                $h = strtolower($h);
+                if ($h === 'k' || $h === 'kills')
+                    $kIndex = $i;
+                if ($h === 'd' || $h === 'deaths')
+                    $dIndex = $i;
+                if ($h === 'a' || $h === 'assists')
+                    $aIndex = $i;
+                if ($h === 'player')
+                    $nameIndex = $i;
+            }
+
+            if ($kIndex !== -1 && $dIndex !== -1) {
+                $isStatsTable = true;
+            }
+
+            if ($isStatsTable) {
+                $table->filter('tr')->each(function ($tr) use (&$rawPlayers, $kIndex, $dIndex, $aIndex, $nameIndex) {
+                    $tds = $tr->filter('td');
+                    if ($tds->count() > max($kIndex, $dIndex, $aIndex)) {
+                        $nameNode = $tds->eq($nameIndex);
+                        $player = trim($nameNode->text());
+
+                        if (!empty($player)) {
+                            $k = (int) trim($tds->eq($kIndex)->text());
+                            $d = (int) trim($tds->eq($dIndex)->text());
+                            $a = $aIndex !== -1 ? (int) trim($tds->eq($aIndex)->text()) : 0;
+
+                            $rawPlayers[] = [
+                                'name' => $player,
+                                'kills' => $k,
+                                'deaths' => $d,
+                                'assists' => $a,
+                                'agent' => ''
+                            ];
+                        }
+                    }
+                });
+            }
+        });
+
+        // Aggregate players
+        $aggregated = [];
+        foreach ($rawPlayers as $p) {
+            $name = $p['name'];
+            if (!isset($aggregated[$name])) {
+                $aggregated[$name] = [
+                    'name' => $name,
+                    'kills' => 0,
+                    'deaths' => 0,
+                    'assists' => 0,
+                    'agents' => [] // No agents in CS2
+                ];
+            }
+            $aggregated[$name]['kills'] += $p['kills'];
+            $aggregated[$name]['deaths'] += $p['deaths'];
+            $aggregated[$name]['assists'] += $p['assists'];
+        }
+
+        // Format for output
+        $finalPlayers = [];
+        foreach ($aggregated as $p) {
+            $finalPlayers[] = [
+                'name' => $p['name'],
+                'kills' => $p['kills'],
+                'deaths' => $p['deaths'],
+                'assists' => $p['assists'],
+                'agent' => '',
+                'team' => 'Unknown'
+            ];
+        }
+
+        return $finalPlayers;
+    }
+
     public function scrapeMatchDetails(string $url): array
     {
         // Remove domain if present to get relative path for fetch
@@ -80,50 +172,32 @@ class Cs2Scraper extends LiquipediaScraper
         $crawler = new Crawler($html);
         $details = [
             'maps' => [],
-            'streams' => []
+            'streams' => [],
+            'players' => []
         ];
 
-        // Try to find map scores. 
-        // CS2 Liquipedia often uses .match-content or similar blocks for maps.
-        // A common pattern for map list is div.vod-popup or .bracket-popup-body > .match-maps
-        // Or simply look for text "Map X: ..."
-
-        // This is a simplified extractor looking for map headers
-        $crawler->filter('.match-content div[style*="width:23%"]')->each(function (Crawler $node) use (&$details) {
-            $text = $node->text();
-            if (str_contains($text, 'Map')) {
-                // Try to get score sibling
-            }
-        });
-
-        // let's try a more robust generic approach for now:
-        // Find elements with class "mapname"
-        $crawler->filter('.mapname')->each(function (Crawler $node) use (&$details) {
+        // Maps extraction (Improved)
+        $crawler->filter('div.mapname')->each(function (Crawler $node) use (&$details) {
             $mapName = trim($node->text());
-
-            // Try to find the score nearby. Usually parent has the score.
             $parent = $node->closest('div');
+
             if ($parent) {
-                // Try to find scores
                 $t1Score = $parent->filter('.results-left')->count() ? $parent->filter('.results-left')->text() : '?';
                 $t2Score = $parent->filter('.results-right')->count() ? $parent->filter('.results-right')->text() : '?';
 
-                if ($mapName) {
-                    $details['maps'][] = [
-                        'name' => $mapName,
-                        'score1' => trim($t1Score),
-                        'score2' => trim($t2Score)
-                    ];
-                }
+                $details['maps'][] = [
+                    'name' => $mapName,
+                    'score1' => trim($t1Score),
+                    'score2' => trim($t2Score)
+                ];
             }
         });
 
-        // If empty, try another common selector for "Match Info" box scores
+        // Fallback for maps if mapname class not found
         if (empty($details['maps'])) {
             $crawler->filter('div.match-history-game')->each(function (Crawler $node) use (&$details) {
                 $mapNode = $node->filter('.match-history-map');
                 $mapName = $mapNode->count() ? trim($mapNode->text()) : 'Unknown';
-
                 $scoreNode = $node->filter('.match-history-score');
                 $score = $scoreNode->count() ? $scoreNode->text() : '';
 
@@ -137,6 +211,9 @@ class Cs2Scraper extends LiquipediaScraper
                 }
             });
         }
+
+        // Extract Players
+        $details['players'] = $this->extractPlayerStats($crawler);
 
         return $details;
     }

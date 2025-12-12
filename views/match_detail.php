@@ -152,6 +152,62 @@
                 </div>
             <?php endif; ?>
 
+            <!-- Player Statistics -->
+            <?php if (!empty($match['details_decoded']['players'])): ?>
+                <div class="mb-12">
+                    <h3 class="text-center text-lg font-bold text-white uppercase tracking-widest mb-6">Player Statistics
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-zinc-400">
+                            <thead class="text-xs text-zinc-500 uppercase bg-zinc-800/50 border-b border-zinc-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider">Player</th>
+                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">Agent/Champ</th>
+                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">K</th>
+                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">D</th>
+                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">A</th>
+                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">K/D</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-zinc-800">
+                                <?php foreach ($match['details_decoded']['players'] as $player): ?>
+                                    <tr class="bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors">
+                                        <td class="px-6 py-4 font-medium text-white whitespace-nowrap">
+                                            <?= htmlspecialchars($player['name']) ?>
+                                        </td>
+                                        <td class="px-6 py-4 text-center">
+                                            <?php if (!empty($player['agent'])): ?>
+                                                <span
+                                                    class="inline-block px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-300 border border-zinc-700">
+                                                    <?= htmlspecialchars($player['agent']) ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-zinc-600">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="px-6 py-4 text-center font-mono text-indigo-400 font-bold">
+                                            <?= htmlspecialchars($player['kills']) ?>
+                                        </td>
+                                        <td class="px-6 py-4 text-center font-mono text-rose-400 font-bold">
+                                            <?= htmlspecialchars($player['deaths']) ?>
+                                        </td>
+                                        <td class="px-6 py-4 text-center font-mono text-zinc-300">
+                                            <?= htmlspecialchars($player['assists']) ?>
+                                        </td>
+                                        <td class="px-6 py-4 text-center font-mono text-zinc-500">
+                                            <?php
+                                            $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
+                                            echo number_format($kd, 2);
+                                            ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <!-- External Link -->
             <?php if (!empty($match['match_url'])): ?>
                 <div class="text-center">

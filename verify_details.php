@@ -9,7 +9,7 @@ use App\Classes\Cs2Scraper;
 // These need to be real recent matches to ensure structure is valid.
 // I will use some generic ones, hoping they exist or redirect correctly.
 $testUrls = [
-    'valorant' => 'https://liquipedia.net/valorant/Match:Vigor_Esports_vs_DSg_v_2',
+    'valorant' => 'https://liquipedia.net/valorant/Match:ID_XB03pz496u_R01-M001',
     'cs2' => 'https://liquipedia.net/counterstrike/Match:FaZe_Clan_vs_Natus_Vincere', // Likely broken but worth a try or user can replace
     'lol' => 'https://liquipedia.net/leagueoflegends/Match:T1_vs_Gen.G'
 ];

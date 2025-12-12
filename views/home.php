@@ -14,42 +14,78 @@
                 'lol' => 'LEAGUE',
                 'cs2' => 'CS2'
             ];
-            // $activeTab is passed from Controller
-            // Preserve region param
-            $currentRegion = $_GET['region'] ?? 'all';
-            $regionParam = $currentRegion !== 'all' ? "?region=$currentRegion" : "";
+            // $activeTab, $activeRegion, $activeStatus passed from Controller
+            // Build query params helper
+            $buildUrl = function ($game = null, $region = null, $status = null) use ($activeTab, $activeRegion, $activeStatus) {
+                $params = [];
+                $g = $game ?? $activeTab;
+                // If game is 'all' (default), we might use '.' as base, but for consistency let's stick to query strings or path
+                // Existing logic uses path for game type.
+                $baseUrl = ($g === 'all' || $g === null) ? '.' : $g;
+
+                $r = $region ?? $activeRegion;
+                if ($r && $r !== 'all')
+                    $params['region'] = $r;
+
+                $s = $status ?? $activeStatus;
+                if ($s && $s !== 'all')
+                    $params['status'] = $s;
+
+                $queryString = !empty($params) ? '?' . http_build_query($params) : '';
+                return $baseUrl . $queryString;
+            };
             ?>
             <?php foreach ($tabs as $key => $label): ?>
-                <a href="<?= $key === 'all' ? '.' : $key ?><?= $regionParam ?>"
+                <a href="<?= $buildUrl($key, null, null) ?>"
                     class="px-6 py-2 rounded-sm text-xs font-bold tracking-wider transition-all duration-200 uppercase <?= ($activeTab ?? 'all') === $key ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' ?>">
                     <?= $label ?>
                 </a>
             <?php endforeach; ?>
         </div>
 
-        <!-- Region Tabs (Sub-filter) -->
-        <div class="flex gap-2">
-            <?php
-            $regions = [
-                'all' => 'ALL REGIONS',
-                'Americas' => 'AMERICAS',
-                'EMEA' => 'EMEA',
-                'Pacific' => 'PACIFIC',
-                'International' => 'INTL',
-                'Other' => 'OTHER'
-            ];
-            $currentBaseUrl = ($activeTab === 'all' || $activeTab === null) ? '.' : $activeTab;
-            ?>
-            <?php foreach ($regions as $key => $label): ?>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <!-- Region Tabs (Sub-filter) -->
+            <div class="flex gap-2">
                 <?php
-                $isActive = ($activeRegion ?? 'all') === $key;
-                $url = $currentBaseUrl . ($key === 'all' ? '' : "?region=$key");
+                $regions = [
+                    'all' => 'ALL REGIONS',
+                    'Americas' => 'AMERICAS',
+                    'EMEA' => 'EMEA',
+                    'Pacific' => 'PACIFIC',
+                    'International' => 'INTL',
+                    'Other' => 'OTHER'
+                ];
                 ?>
-                <a href="<?= $url ?>"
-                    class="px-3 py-1.5 rounded-sm text-[10px] font-bold tracking-wider transition-all duration-200 uppercase border <?= $isActive ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800/50' ?>">
-                    <?= $label ?>
-                </a>
-            <?php endforeach; ?>
+                <?php foreach ($regions as $key => $label): ?>
+                    <?php
+                    $isActive = ($activeRegion ?? 'all') === $key;
+                    ?>
+                    <a href="<?= $buildUrl(null, $key, null) ?>"
+                        class="px-3 py-1.5 rounded-sm text-[10px] font-bold tracking-wider transition-all duration-200 uppercase border <?= $isActive ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800/50' ?>">
+                        <?= $label ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Status Tabs -->
+            <div class="flex gap-2 border-l border-zinc-800 pl-4">
+                <?php
+                $statuses = [
+                    'all' => 'ANY STATUS',
+                    'upcoming' => 'UPCOMING',
+                    'completed' => 'COMPLETED'
+                ];
+                ?>
+                <?php foreach ($statuses as $key => $label): ?>
+                    <?php
+                    $isActive = ($activeStatus ?? 'all') === $key;
+                    ?>
+                    <a href="<?= $buildUrl(null, null, $key) ?>"
+                        class="px-3 py-1.5 rounded-sm text-[10px] font-bold tracking-wider transition-all duration-200 uppercase border <?= $isActive ? 'bg-emerald-900/30 text-emerald-400 border-emerald-900/50' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800/50' ?>">
+                        <?= $label ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 

@@ -46,7 +46,7 @@ class MatchModel
         }
     }
 
-    public function getAllMatches(?string $gameType = null, ?string $region = null): array
+    public function getAllMatches(?string $gameType = null, ?string $region = null, ?string $status = null): array
     {
         $sql = "SELECT * FROM matches";
         $params = [];
@@ -60,6 +60,14 @@ class MatchModel
         if ($region && $region !== 'all') {
             $conditions[] = "match_region = :region";
             $params[':region'] = $region;
+        }
+
+        if ($status && $status !== 'all') {
+            if ($status === 'upcoming') {
+                $conditions[] = "match_status = 'upcoming'";
+            } elseif ($status === 'completed') {
+                $conditions[] = "match_status != 'upcoming'"; // Covers 'completed', 'live'
+            }
         }
 
         if (!empty($conditions)) {
