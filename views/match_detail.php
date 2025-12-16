@@ -19,132 +19,221 @@
 
         <div class="p-8 md:p-12">
             <!-- Header Info -->
-            <div class="text-center mb-12">
-                <div class="flex justify-center gap-2 mb-4">
-                    <span
-                        class="inline-block px-3 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 font-mono uppercase">
-                        <?= htmlspecialchars($match['game_type']) ?>
-                    </span>
-                    <span
-                        class="inline-block px-3 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 font-mono uppercase">
-                        <?= htmlspecialchars($match['match_region']) ?>
-                    </span>
+            <div class="text-center mb-16 relative">
+                <div
+                    class="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none">
                 </div>
 
-                <h2 class="text-lg text-indigo-400 font-bold uppercase tracking-widest mb-2">
-                    <?= htmlspecialchars($match['tournament_name']) ?>
-                </h2>
+                <div class="relative z-10 flex flex-col items-center">
+                    <div class="flex justify-center gap-2 mb-6">
+                        <span
+                            class="inline-flex items-center px-3 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/50 text-[10px] text-zinc-400 font-bold uppercase tracking-widest backdrop-blur-sm shadow-sm">
+                            <span class="w-1.5 h-1.5 rounded-full bg-zinc-500 mr-2"></span>
+                            <?= htmlspecialchars($match['game_type']) ?>
+                        </span>
+                        <span
+                            class="inline-flex items-center px-3 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/50 text-[10px] text-zinc-400 font-bold uppercase tracking-widest backdrop-blur-sm shadow-sm">
+                            <?= htmlspecialchars($match['match_region']) ?>
+                        </span>
+                    </div>
 
-                <p class="text-zinc-500 font-mono text-sm">
-                    <?= date('F j, Y • H:i', strtotime($match['match_time'])) ?> UTC
-                </p>
+                    <h2
+                        class="text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 font-black uppercase tracking-wider mb-3 drop-shadow-sm">
+                        <?= htmlspecialchars($match['tournament_name']) ?>
+                    </h2>
+
+                    <p class="text-zinc-500 font-mono text-sm tracking-wide">
+                        <?= date('F j, Y • H:i', strtotime($match['match_time'])) ?> UTC
+                    </p>
+                </div>
             </div>
 
             <!-- Scoreboard -->
-            <div class="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 mb-16">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 mb-20 relative">
+                <!-- Background Separator Effect -->
+                <div
+                    class="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-24 bg-gradient-to-b from-transparent via-zinc-800 to-transparent">
+                </div>
+
                 <!-- Team 1 -->
-                <div class="text-center flex-1 w-full">
-                    <div class="text-3xl md:text-5xl font-black text-white mb-2 break-words"
+                <div class="text-center md:text-right flex-1 w-full group">
+                    <div class="text-4xl md:text-6xl font-black text-white mb-2 break-words leading-tight tracking-tighter group-hover:text-indigo-400 transition-colors duration-300"
                         title="<?= htmlspecialchars($match['team1_name']) ?>">
                         <?= htmlspecialchars($match['team1_name']) ?>
                     </div>
+                    <div
+                        class="text-xs font-bold text-zinc-600 uppercase tracking-[0.2em] group-hover:text-zinc-500 transition-colors">
+                        Team A</div>
                 </div>
 
-                <!-- VS / Score -->
-                <div class="flex flex-col items-center justify-center shrink-0 mx-4">
+                <!-- Score / VS -->
+                <div class="flex flex-col items-center justify-center shrink-0 mx-4 z-10 min-w-[140px]">
                     <?php if (($match['match_status'] ?? 'upcoming') === 'upcoming'): ?>
                         <div
-                            class="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 mb-2">
-                            <span class="text-xl font-black text-zinc-500">VS</span>
+                            class="w-20 h-20 rounded-full bg-zinc-900 flex items-center justify-center border-4 border-zinc-800 shadow-xl relative overflow-hidden group">
+                            <div
+                                class="absolute inset-0 bg-gradient-to-tr from-zinc-800 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                            </div>
+                            <span
+                                class="text-2xl font-black text-zinc-700 group-hover:text-zinc-500 transition-colors">VS</span>
                         </div>
                     <?php else: ?>
-                        <div class="text-6xl font-black text-white tracking-tighter tabular-nums">
-                            <?= $match['team1_score'] ?> <span class="text-zinc-700 mx-2">:</span>
-                            <?= $match['team2_score'] ?>
+                        <div class="flex items-center gap-1">
+                            <span
+                                class="text-7xl md:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                                <?= $match['team1_score'] ?>
+                            </span>
+                            <span class="text-4xl font-thin text-zinc-700 mb-2">:</span>
+                            <span
+                                class="text-7xl md:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                                <?= $match['team2_score'] ?>
+                            </span>
                         </div>
-                        <span
-                            class="mt-4 px-3 py-1 rounded bg-zinc-800 text-white text-xs font-bold uppercase tracking-wider border border-zinc-700">
+
+                        <div class="mt-4">
                             <?php if ($match['match_status'] === 'live'): ?>
-                                <span class="w-2 h-2 bg-rose-500 rounded-full inline-block mr-2 animate-pulse"></span> LIVE
+                                <span
+                                    class="inline-flex items-center px-4 py-1.5 rounded bg-rose-500/10 text-rose-500 text-xs font-bold uppercase tracking-widest border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse">
+                                    <span class="w-2 h-2 bg-rose-500 rounded-full inline-block mr-2 animate-ping"></span>
+                                    LIVE MATCH
+                                </span>
                             <?php else: ?>
-                                FINAL
+                                <span
+                                    class="inline-block px-4 py-1.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] border border-zinc-700 shadow-sm">
+                                    Final Score
+                                </span>
                             <?php endif; ?>
-                        </span>
+                        </div>
                     <?php endif; ?>
                 </div>
 
                 <!-- Team 2 -->
-                <div class="text-center flex-1 w-full">
-                    <div class="text-3xl md:text-5xl font-black text-white mb-2 break-words"
+                <div class="text-center md:text-left flex-1 w-full group">
+                    <div class="text-4xl md:text-6xl font-black text-white mb-2 break-words leading-tight tracking-tighter group-hover:text-rose-400 transition-colors duration-300"
                         title="<?= htmlspecialchars($match['team2_name']) ?>">
                         <?= htmlspecialchars($match['team2_name']) ?>
                     </div>
+                    <div
+                        class="text-xs font-bold text-zinc-600 uppercase tracking-[0.2em] group-hover:text-zinc-500 transition-colors">
+                        Team B</div>
                 </div>
             </div>
 
             <!-- AI Prediction Bar -->
-            <div class="mb-12 max-w-2xl mx-auto">
-                <div class="flex justify-between items-end mb-2">
-                    <div class="text-left">
-                        <span class="block text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Win
-                            Probability</span>
-                        <span
-                            class="text-2xl font-black text-indigo-500"><?= number_format($match['ai_prediction'], 1) ?>%</span>
-                    </div>
-                    <div class="text-right">
-                        <span class="block text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Win
-                            Probability</span>
-                        <span
-                            class="text-2xl font-black text-rose-500"><?= number_format(100 - $match['ai_prediction'], 1) ?>%</span>
-                    </div>
+            <div class="mb-16 max-w-3xl mx-auto">
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="h-px bg-zinc-800 flex-grow"></div>
+                    <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        AI Win Probability
+                    </h3>
+                    <div class="h-px bg-zinc-800 flex-grow"></div>
                 </div>
 
-                <div class="h-2 bg-zinc-800 rounded-full overflow-hidden flex">
-                    <div class="h-full bg-indigo-500" style="width: <?= $match['ai_prediction'] ?>%"></div>
-                    <div class="h-full bg-rose-500" style="width: <?= 100 - $match['ai_prediction'] ?>%"></div>
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+                    <div class="flex justify-between items-end mb-4 relative z-10">
+                        <div class="text-left">
+                            <span class="block text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Team
+                                A</span>
+                            <span
+                                class="text-4xl font-black text-indigo-500 tabular-nums tracking-tighter drop-shadow-sm"><?= number_format($match['ai_prediction'], 1) ?>%</span>
+                        </div>
+                        <!-- V Divider -->
+                        <div class="text-zinc-700 font-black text-xl self-center opacity-20">/</div>
+
+                        <div class="text-right">
+                            <span class="block text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Team
+                                B</span>
+                            <span
+                                class="text-4xl font-black text-rose-500 tabular-nums tracking-tighter drop-shadow-sm"><?= number_format(100 - $match['ai_prediction'], 1) ?>%</span>
+                        </div>
+                    </div>
+
+                    <div class="h-3 bg-zinc-800 rounded-full overflow-hidden flex ring-1 ring-zinc-700/50">
+                        <div class="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 shadow-[0_0_10px_rgba(99,102,241,0.5)] relative"
+                            style="width: <?= $match['ai_prediction'] ?>%">
+                            <div
+                                class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30">
+                            </div>
+                        </div>
+                        <div class="h-full bg-zinc-800 w-px"></div>
+                        <div class="h-full bg-gradient-to-l from-rose-500 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.5)] relative"
+                            style="width: <?= 100 - $match['ai_prediction'] ?>%">
+                            <div
+                                class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <p class="text-[10px] text-zinc-600 font-mono">
+                            Based on historical performance & recent form
+                        </p>
+                    </div>
                 </div>
             </div>
 
             <!-- Details List -->
-            <div class="bg-zinc-900/50 rounded border border-zinc-800/50 p-6 max-w-2xl mx-auto mb-8">
-                <h3
-                    class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 border-b border-zinc-800 pb-2">
-                    Match Details</h3>
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <span class="block text-zinc-600 text-xs mb-1">Format</span>
-                        <span class="text-zinc-300 font-mono"><?= $match['bo_type'] ?? 'Best of 3 (Est.)' ?></span>
-                    </div>
-                    <div>
-                        <span class="block text-zinc-600 text-xs mb-1">Data Source</span>
-                        <span class="text-zinc-300 font-mono">Liquipedia Scraper</span>
-                    </div>
-                    <div>
-                        <span class="block text-zinc-600 text-xs mb-1">Last Updated</span>
-                        <span class="text-zinc-300 font-mono"><?= $match['created_at'] ?></span>
-                    </div>
-                    <div>
-                        <span class="block text-zinc-600 text-xs mb-1">Status</span>
-                        <span class="text-zinc-300 font-mono capitalize"><?= $match['match_status'] ?></span>
-                    </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16 border-y border-zinc-800 py-8 bg-zinc-900/30">
+                <div class="text-center border-r border-zinc-800 last:border-0 md:last:border-0">
+                    <span class="block text-zinc-500 text-[10px] uppercase tracking-widest mb-2 font-bold">Format</span>
+                    <span class="text-zinc-200 font-mono font-bold"><?= $match['bo_type'] ?? 'Bo3' ?></span>
+                </div>
+                <div class="text-center border-r border-zinc-800 max-md:border-0 md:border-r">
+                    <span class="block text-zinc-500 text-[10px] uppercase tracking-widest mb-2 font-bold">Source</span>
+                    <span class="text-zinc-200 font-mono font-bold">Liquipedia</span>
+                </div>
+                <div class="text-center border-r border-zinc-800 max-md:border-t max-md:pt-4 md:border-t-0 md:pt-0">
+                    <span
+                        class="block text-zinc-500 text-[10px] uppercase tracking-widest mb-2 font-bold">Updated</span>
+                    <span
+                        class="text-zinc-200 font-mono font-bold text-xs"><?= date('H:i', strtotime($match['created_at'])) ?>
+                        UTC</span>
+                </div>
+                <div class="text-center max-md:border-t max-md:pt-4 md:border-t-0 md:pt-0">
+                    <span class="block text-zinc-500 text-[10px] uppercase tracking-widest mb-2 font-bold">Status</span>
+                    <span
+                        class="inline-block px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-bold uppercase tracking-wider border border-zinc-700 capitalize">
+                        <?= $match['match_status'] ?>
+                    </span>
                 </div>
             </div>
 
             <!-- Detailed Stats / Maps -->
             <?php if (!empty($match['details_decoded']['maps'])): ?>
                 <div class="mb-12">
-                    <h3 class="text-center text-lg font-bold text-white uppercase tracking-widest mb-6">Map Breakdown</h3>
-                    <div class="grid gap-4 max-w-2xl mx-auto">
-                        <?php foreach ($match['details_decoded']['maps'] as $map): ?>
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                        <h3 class="text-lg font-bold text-white uppercase tracking-[0.2em]">Map Breakdown</h3>
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <?php foreach ($match['details_decoded']['maps'] as $index => $map): ?>
                             <div
-                                class="bg-zinc-800/40 border border-zinc-700/50 p-4 rounded-sm flex items-center justify-between">
+                                class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 flex flex-col items-center justify-center relative overflow-hidden group hover:border-zinc-700 transition-colors">
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                </div>
+                                <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Map
+                                    <?= $index + 1 ?></span>
                                 <span
-                                    class="font-bold text-zinc-300 font-mono text-lg"><?= htmlspecialchars($map['name']) ?></span>
-                                <div class="flex items-center gap-4">
+                                    class="font-black text-white font-mono text-2xl mb-4 tracking-tight"><?= htmlspecialchars($map['name']) ?></span>
+
+                                <div
+                                    class="flex items-center gap-6 bg-zinc-950/50 px-6 py-2 rounded-full border border-zinc-800/50">
                                     <span
-                                        class="text-indigo-400 font-bold text-xl"><?= htmlspecialchars($map['score1']) ?></span>
-                                    <span class="text-zinc-600">-</span>
-                                    <span class="text-rose-400 font-bold text-xl"><?= htmlspecialchars($map['score2']) ?></span>
+                                        class="text-2xl font-bold <?= $map['score1'] > $map['score2'] ? 'text-indigo-400' : 'text-zinc-500' ?>">
+                                        <?= htmlspecialchars($map['score1']) ?>
+                                    </span>
+                                    <span class="text-zinc-700 font-black">-</span>
+                                    <span
+                                        class="text-2xl font-bold <?= $map['score2'] > $map['score1'] ? 'text-rose-400' : 'text-zinc-500' ?>">
+                                        <?= htmlspecialchars($map['score2']) ?>
+                                    </span>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -160,80 +249,107 @@
                     $team = $player['team'] ?? 'Unknown Team';
                     $playersByTeam[$team][] = $player;
                 }
-                // Sort teams to match Team 1 / Team 2 name if possible, otherwise alphabetical or as-is
-                // Simple attempt to match team1/team2 order
+
+                // Sort teams to match Team 1 / Team 2 name logic
                 $orderedTeams = [];
                 if (isset($playersByTeam[$match['team1_name']])) {
                     $orderedTeams[$match['team1_name']] = $playersByTeam[$match['team1_name']];
                     unset($playersByTeam[$match['team1_name']]);
                 }
-                // Try fuzzy match or exact match
-                // For now, just append the rest
+                if (isset($playersByTeam[$match['team2_name']])) {
+                    $orderedTeams[$match['team2_name']] = $playersByTeam[$match['team2_name']];
+                    unset($playersByTeam[$match['team2_name']]);
+                }
+                // Append remaining
                 foreach ($playersByTeam as $name => $pList) {
                     $orderedTeams[$name] = $pList;
                 }
                 ?>
-                <div class="mb-12">
-                    <h3 class="text-center text-lg font-bold text-white uppercase tracking-widest mb-6">Player Statistics
-                    </h3>
+                <div class="mb-16">
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                        <h3 class="text-lg font-bold text-white uppercase tracking-[0.2em]">Player Statistics</h3>
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                    </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                         <?php foreach ($orderedTeams as $teamName => $players): ?>
-                            <div class="bg-zinc-900/50 rounded border border-zinc-800/50 overflow-hidden">
-                                <h4
-                                    class="bg-zinc-800/80 text-center text-sm font-bold text-zinc-300 uppercase tracking-wider py-3 border-b border-zinc-700">
-                                    <?= htmlspecialchars($teamName) ?>
-                                </h4>
+                            <div
+                                class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+                                <!-- Team Header -->
+                                <div
+                                    class="px-6 py-4 bg-zinc-900/50 border-b border-zinc-800 flex items-center justify-between relative overflow-hidden">
+                                    <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-50">
+                                    </div>
+                                    <h4 class="relative z-10 text-lg font-black text-white italic tracking-wide">
+                                        <?= htmlspecialchars($teamName) ?>
+                                    </h4>
+                                    <span class="relative z-10 text-xs font-mono text-zinc-500 uppercase">
+                                        <?= count($players) ?> Players
+                                    </span>
+                                </div>
+
+                                <!-- Table -->
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-xs text-left text-zinc-400">
-                                        <thead
-                                            class="text-[10px] text-zinc-500 uppercase bg-zinc-800/30 border-b border-zinc-700">
-                                            <tr>
-                                                <th scope="col" class="px-4 py-2 font-bold tracking-wider">Player</th>
-                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">Ag</th>
-                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">K</th>
-                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">D</th>
-                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">A</th>
-                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">K/D</th>
+                                    <table class="w-full text-left">
+                                        <thead>
+                                            <tr class="border-b border-zinc-800 bg-zinc-900/80">
+                                                <th
+                                                    class="px-6 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                    Player</th>
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    Agent</th>
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    K</th>
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    D</th>
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    A</th>
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    K/D</th>
                                             </tr>
                                         </thead>
-                                        <tbody class="divide-y divide-zinc-800">
+                                        <tbody class="divide-y divide-zinc-800/50">
                                             <?php foreach ($players as $player): ?>
-                                                <tr class="group hover:bg-zinc-800/50 transition-colors">
-                                                    <td class="px-4 py-2 font-medium text-white whitespace-nowrap">
-                                                        <?= htmlspecialchars($player['name']) ?>
+                                                <?php
+                                                $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
+                                                $kdColor = $kd >= 1.0 ? 'text-emerald-400' : 'text-rose-400';
+                                                if ($player['kills'] == 0 && $player['deaths'] == 0)
+                                                    $kdColor = 'text-zinc-500';
+                                                ?>
+                                                <tr class="group hover:bg-white/[0.02] transition-colors">
+                                                    <td class="px-6 py-3">
+                                                        <div
+                                                            class="font-bold text-zinc-200 text-sm group-hover:text-white transition-colors">
+                                                            <?= htmlspecialchars($player['name']) ?>
+                                                        </div>
                                                     </td>
-                                                    <td class="px-2 py-2 text-center">
+                                                    <td class="px-4 py-3 text-center">
                                                         <?php if (!empty($player['agent'])): ?>
-                                                            <div class="group/tooltip relative inline-block">
-                                                                <span
-                                                                    class="inline-block px-1.5 py-0.5 bg-zinc-800 rounded text-[10px] text-zinc-300 border border-zinc-700">
-                                                                    <?= htmlspecialchars(substr($player['agent'], 0, 3)) ?>
-                                                                </span>
-                                                                <!-- Tooltip for full agent name -->
-                                                                <span
-                                                                    class="invisible group-hover/tooltip:visible absolute bottm-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-10">
-                                                                    <?= htmlspecialchars($player['agent']) ?>
-                                                                </span>
-                                                            </div>
+                                                            <span
+                                                                class="inline-flex items-center justify-center px-2 py-1 rounded bg-zinc-800 border border-zinc-700 text-[10px] font-medium text-zinc-300 shadow-sm">
+                                                                <?= htmlspecialchars($player['agent']) ?>
+                                                            </span>
                                                         <?php else: ?>
-                                                            <span class="text-zinc-600">-</span>
+                                                            <span class="text-zinc-700 text-xs">-</span>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td class="px-2 py-2 text-center font-mono text-indigo-400 font-bold">
+                                                    <td class="px-4 py-3 text-center font-mono text-sm text-zinc-300 font-medium">
                                                         <?= htmlspecialchars($player['kills']) ?>
                                                     </td>
-                                                    <td class="px-2 py-2 text-center font-mono text-rose-400 font-bold">
+                                                    <td class="px-4 py-3 text-center font-mono text-sm text-zinc-400">
                                                         <?= htmlspecialchars($player['deaths']) ?>
                                                     </td>
-                                                    <td class="px-2 py-2 text-center font-mono text-zinc-300">
+                                                    <td class="px-4 py-3 text-center font-mono text-sm text-zinc-400">
                                                         <?= htmlspecialchars($player['assists']) ?>
                                                     </td>
-                                                    <td class="px-2 py-2 text-center font-mono text-zinc-500">
-                                                        <?php
-                                                        $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
-                                                        echo number_format($kd, 2);
-                                                        ?>
+                                                    <td class="px-4 py-3 text-center font-mono text-sm font-bold <?= $kdColor ?>">
+                                                        <?= number_format($kd, 2) ?>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>

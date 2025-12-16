@@ -8,7 +8,7 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
 - [ ] Implementar navegación para ver detalles de equipos y jugadores.
 - [ ] Scraper de información de Equipos (Logos, Historia, Roster actual).
 - [ ] Scraper de información de Jugadores (Biografía, Estadísticas, Historial).
-- [ ] Mejorar diseño de la página principal (más agradable, Tailwind).
+- [x] Mejorar diseño de la página principal (más agradable, Tailwind).
 - [ ] Ordenar tabla de partidos por fecha.
 
 ## 🚀 Fase 1: Configuración Inicial (Skeleton)
