@@ -154,56 +154,94 @@
 
             <!-- Player Statistics -->
             <?php if (!empty($match['details_decoded']['players'])): ?>
+                <?php
+                $playersByTeam = [];
+                foreach ($match['details_decoded']['players'] as $player) {
+                    $team = $player['team'] ?? 'Unknown Team';
+                    $playersByTeam[$team][] = $player;
+                }
+                // Sort teams to match Team 1 / Team 2 name if possible, otherwise alphabetical or as-is
+                // Simple attempt to match team1/team2 order
+                $orderedTeams = [];
+                if (isset($playersByTeam[$match['team1_name']])) {
+                    $orderedTeams[$match['team1_name']] = $playersByTeam[$match['team1_name']];
+                    unset($playersByTeam[$match['team1_name']]);
+                }
+                // Try fuzzy match or exact match
+                // For now, just append the rest
+                foreach ($playersByTeam as $name => $pList) {
+                    $orderedTeams[$name] = $pList;
+                }
+                ?>
                 <div class="mb-12">
                     <h3 class="text-center text-lg font-bold text-white uppercase tracking-widest mb-6">Player Statistics
                     </h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left text-zinc-400">
-                            <thead class="text-xs text-zinc-500 uppercase bg-zinc-800/50 border-b border-zinc-700">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider">Player</th>
-                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">Agent/Champ</th>
-                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">K</th>
-                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">D</th>
-                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">A</th>
-                                    <th scope="col" class="px-6 py-3 font-bold tracking-wider text-center">K/D</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-zinc-800">
-                                <?php foreach ($match['details_decoded']['players'] as $player): ?>
-                                    <tr class="bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors">
-                                        <td class="px-6 py-4 font-medium text-white whitespace-nowrap">
-                                            <?= htmlspecialchars($player['name']) ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-center">
-                                            <?php if (!empty($player['agent'])): ?>
-                                                <span
-                                                    class="inline-block px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-300 border border-zinc-700">
-                                                    <?= htmlspecialchars($player['agent']) ?>
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-zinc-600">-</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-center font-mono text-indigo-400 font-bold">
-                                            <?= htmlspecialchars($player['kills']) ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-center font-mono text-rose-400 font-bold">
-                                            <?= htmlspecialchars($player['deaths']) ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-center font-mono text-zinc-300">
-                                            <?= htmlspecialchars($player['assists']) ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-center font-mono text-zinc-500">
-                                            <?php
-                                            $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
-                                            echo number_format($kd, 2);
-                                            ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <?php foreach ($orderedTeams as $teamName => $players): ?>
+                            <div class="bg-zinc-900/50 rounded border border-zinc-800/50 overflow-hidden">
+                                <h4
+                                    class="bg-zinc-800/80 text-center text-sm font-bold text-zinc-300 uppercase tracking-wider py-3 border-b border-zinc-700">
+                                    <?= htmlspecialchars($teamName) ?>
+                                </h4>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-xs text-left text-zinc-400">
+                                        <thead
+                                            class="text-[10px] text-zinc-500 uppercase bg-zinc-800/30 border-b border-zinc-700">
+                                            <tr>
+                                                <th scope="col" class="px-4 py-2 font-bold tracking-wider">Player</th>
+                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">Ag</th>
+                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">K</th>
+                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">D</th>
+                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">A</th>
+                                                <th scope="col" class="px-2 py-2 font-bold tracking-wider text-center">K/D</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-zinc-800">
+                                            <?php foreach ($players as $player): ?>
+                                                <tr class="group hover:bg-zinc-800/50 transition-colors">
+                                                    <td class="px-4 py-2 font-medium text-white whitespace-nowrap">
+                                                        <?= htmlspecialchars($player['name']) ?>
+                                                    </td>
+                                                    <td class="px-2 py-2 text-center">
+                                                        <?php if (!empty($player['agent'])): ?>
+                                                            <div class="group/tooltip relative inline-block">
+                                                                <span
+                                                                    class="inline-block px-1.5 py-0.5 bg-zinc-800 rounded text-[10px] text-zinc-300 border border-zinc-700">
+                                                                    <?= htmlspecialchars(substr($player['agent'], 0, 3)) ?>
+                                                                </span>
+                                                                <!-- Tooltip for full agent name -->
+                                                                <span
+                                                                    class="invisible group-hover/tooltip:visible absolute bottm-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap z-10">
+                                                                    <?= htmlspecialchars($player['agent']) ?>
+                                                                </span>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <span class="text-zinc-600">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="px-2 py-2 text-center font-mono text-indigo-400 font-bold">
+                                                        <?= htmlspecialchars($player['kills']) ?>
+                                                    </td>
+                                                    <td class="px-2 py-2 text-center font-mono text-rose-400 font-bold">
+                                                        <?= htmlspecialchars($player['deaths']) ?>
+                                                    </td>
+                                                    <td class="px-2 py-2 text-center font-mono text-zinc-300">
+                                                        <?= htmlspecialchars($player['assists']) ?>
+                                                    </td>
+                                                    <td class="px-2 py-2 text-center font-mono text-zinc-500">
+                                                        <?php
+                                                        $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
+                                                        echo number_format($kd, 2);
+                                                        ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             <?php endif; ?>

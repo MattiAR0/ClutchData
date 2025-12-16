@@ -2,12 +2,14 @@
 
 Este archivo rastrea el estado de todas las tareas necesarias para completar el proyecto.
 
-## 📝 Notas
+## 📝 Notas / Backlog
 
-- Agregada la opcion de borrar todos los partidos de la base de datos.
-- Quiero cambiar un poco el diseño de la pagina principal para que sea mas agradable de ver.
-- Quiero que se pueda ordenar la tabla de partidos por fecha.
-- Quiero distintas pestañas para cada juego
+- [x] Separar jugadores por equipo en la vista de detalles del partido.
+- [ ] Implementar navegación para ver detalles de equipos y jugadores.
+- [ ] Scraper de información de Equipos (Logos, Historia, Roster actual).
+- [ ] Scraper de información de Jugadores (Biografía, Estadísticas, Historial).
+- [ ] Mejorar diseño de la página principal (más agradable, Tailwind).
+- [ ] Ordenar tabla de partidos por fecha.
 
 ## 🚀 Fase 1: Configuración Inicial (Skeleton)
 
@@ -27,32 +29,50 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
     - [x] Crear Base de Datos en WampServer.
     - [x] Importar tablas.
 
-## 🛠️ Fase 2: Desarrollo del Backend (Scraping)
+## 🛠️ Fase 2: Desarrollo del Backend (Scraping & Datos)
 
-- [ ] **Implementación de Scrapers**
-    - [ ] Investigar estructura HTML de Liquipedia.
-    - [ ] Implementar `ValorantScraper` (lógica real con Guzzle/DomCrawler).
-    - [ ] Implementar `LolScraper` (lógica real).
-    - [ ] Implementar `Cs2Scraper` (lógica real).
-- [ ] **Almacenamiento de Datos**
-    - [ ] Verificar que `MatchModel` guarda correctamente los datos scrapeados.
-    - [ ] Evitar duplicados al guardar partidos.
+- [x] **Implementación de Scrapers Básicos**
+    - [x] Investigar estructura HTML de Liquipedia.
+    - [x] Implementar `ValorantScraper` (Partidos, Scores, Status).
+    - [x] Implementar `LolScraper` (Partidos, Scores).
+    - [x] Implementar `Cs2Scraper` (Partidos, Scores).
+- [x] **Gestión de Partidos**
+    - [x] Guardado en Base de Datos (`MatchModel`).
+    - [x] Evitar duplicados.
+    - [x] Implementar borrado de partidos.
+- [x] **Detalles de Partidos**
+    - [x] Scraping de estadísticas detalladas (KDA/Agents para Valorant).
+    - [x] Vista de detalles del partido (`match_details.php`).
 
 ## 🧠 Fase 3: Inteligencia y Lógica
 
 - [ ] **Sistema de Predicción**
-    - [ ] Definir algoritmo básico de predicción para `ai_prediction`.
+    - [ ] Definir algoritmo básico de predicción para `ai_prediction` (Simulado por ahora).
     - [ ] Implementar cálculo en el modelo o clase dedicada.
 
 ## 🎨 Fase 4: Frontend y Visualización
 
-- [ ] **Interfaz de Usuario**
-    - [ ] Mejorar diseño de `views/home.php`.
-    - [ ] Mostrar tabla de partidos reales desde la DB.
-    - [ ] Añadir estilos CSS básicos.
+- [x] **Interfaz Básica**
+    - [x] `views/home.php` funcional.
+    - [x] Mostrar tabla de partidos reales desde la DB.
+- [ ] **Mejoras de UI/UX**
+    - [ ] Uso de Tailwind CSS para diseño premium.
+    - [ ] Filtros por Región y Torneo.
+    - [ ] Paginación o Scroll infinito.
 
-## 🏁 Fase 5: Pruebas y Despliegue
+## 🔍 Fase 5: Expansión de Datos (Equipos y Jugadores)
+
+- [ ] **Equipos**
+    - [ ] Crear tabla `teams`.
+    - [ ] Scraper de Equipos (Logo, Nombre, Integrantes).
+    - [ ] Vista de Detalle de Equipo.
+- [ ] **Jugadores**
+    - [ ] Crear tabla `players`.
+    - [ ] Scraper de Jugadores (Foto, Rol, Stats).
+    - [ ] Vista de Detalle de Jugador.
+
+## 🏁 Fase 6: Pruebas y Despliegue
 
 - [ ] **Verificación**
-    - [ ] Probar flujo completo: Scraping -> Guardado DB -> Vista Home.
+    - [ ] Probar flujo completo: Scraping -> Guardado DB -> Navegación.
     - [ ] Verificar funcionamiento en WampServer local.

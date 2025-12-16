@@ -87,51 +87,80 @@ class ValorantScraper extends LiquipediaScraper
         $wrapper = $crawler->filter('.match-bm-players-wrapper')->first();
 
         if ($wrapper->count() > 0) {
-            $wrapper->filter('div.match-bm-players-player')->each(function (Crawler $row) use (&$rawPlayers) {
-                $nameNode = $row->filter('.match-bm-players-player-name');
-                // Prefer name from link to avoid extra text
-                if ($nameNode->filter('a')->count()) {
-                    $player = trim($nameNode->filter('a')->text());
-                } else {
-                    $player = $nameNode->count() ? trim($nameNode->text()) : 'Unknown';
-                }
+            // Updated logic: Iterate over teams first to get team context
+            $wrapper->filter('.match-bm-players-team')->each(function (Crawler $teamNode) use (&$rawPlayers) {
+                // Extract Team Name
+                $teamName = 'Unknown Team';
+                $header = $teamNode->filter('.match-bm-players-team-header');
+                if ($header->count()) {
+                    // Try text first
+                    $text = trim($header->text());
+                    if (!empty($text)) {
+                        $teamName = $text;
+                    } else {
+                        // Try image alt or title
+                        $img = $header->filter('img')->last(); // Last image often contains the logo if multiple
+                        if ($img->count()) {
+                            $teamName = $img->attr('alt') ?? $img->attr('title') ?? 'Unknown Team';
+                        }
 
-                // Collect Agents
-                $agent = '';
-                $agentImg = $nameNode->filter('img')->last();
-                if ($agentImg->count()) {
-                    $agent = $agentImg->attr('alt') ?? $agentImg->attr('title') ?? '';
-                }
-
-                $k = 0;
-                $d = 0;
-                $a = 0;
-
-                $row->filter('.match-bm-players-player-stat')->each(function (Crawler $stat) use (&$k, &$d, &$a) {
-                    $titleNode = $stat->filter('.match-bm-players-player-stat-title');
-                    $title = $titleNode->count() ? trim($titleNode->text()) : '';
-
-                    if (str_contains($title, 'KDA')) {
-                        $dataNode = $stat->filter('.match-bm-players-player-stat-data');
-                        $data = $dataNode->count() ? trim($dataNode->text()) : '';
-                        $parts = explode('/', $data);
-                        if (count($parts) >= 3) {
-                            $k = (int) trim($parts[0]);
-                            $d = (int) trim($parts[1]);
-                            $a = (int) trim($parts[2]);
+                        // Fallback to link title
+                        if ($teamName === 'Unknown Team') {
+                            $link = $header->filter('a')->first();
+                            if ($link->count()) {
+                                $teamName = $link->attr('title') ?? 'Unknown Team';
+                            }
                         }
                     }
-                });
-
-                if ($player !== 'Unknown' && ($k > 0 || $d > 0 || $a > 0)) {
-                    $rawPlayers[] = [
-                        'name' => $player,
-                        'kills' => $k,
-                        'deaths' => $d,
-                        'assists' => $a,
-                        'agent' => $agent
-                    ];
                 }
+
+                $teamNode->filter('div.match-bm-players-player')->each(function (Crawler $row) use (&$rawPlayers, $teamName) {
+                    $nameNode = $row->filter('.match-bm-players-player-name');
+                    // Prefer name from link to avoid extra text
+                    if ($nameNode->filter('a')->count()) {
+                        $player = trim($nameNode->filter('a')->text());
+                    } else {
+                        $player = $nameNode->count() ? trim($nameNode->text()) : 'Unknown';
+                    }
+
+                    // Collect Agents
+                    $agent = '';
+                    $agentImg = $nameNode->filter('img')->last();
+                    if ($agentImg->count()) {
+                        $agent = $agentImg->attr('alt') ?? $agentImg->attr('title') ?? '';
+                    }
+
+                    $k = 0;
+                    $d = 0;
+                    $a = 0;
+
+                    $row->filter('.match-bm-players-player-stat')->each(function (Crawler $stat) use (&$k, &$d, &$a) {
+                        $titleNode = $stat->filter('.match-bm-players-player-stat-title');
+                        $title = $titleNode->count() ? trim($titleNode->text()) : '';
+
+                        if (str_contains($title, 'KDA')) {
+                            $dataNode = $stat->filter('.match-bm-players-player-stat-data');
+                            $data = $dataNode->count() ? trim($dataNode->text()) : '';
+                            $parts = explode('/', $data);
+                            if (count($parts) >= 3) {
+                                $k = (int) trim($parts[0]);
+                                $d = (int) trim($parts[1]);
+                                $a = (int) trim($parts[2]);
+                            }
+                        }
+                    });
+
+                    if ($player !== 'Unknown' && ($k > 0 || $d > 0 || $a > 0)) {
+                        $rawPlayers[] = [
+                            'name' => $player,
+                            'kills' => $k,
+                            'deaths' => $d,
+                            'assists' => $a,
+                            'agent' => $agent,
+                            'team' => $teamName
+                        ];
+                    }
+                });
             });
         }
 
@@ -210,7 +239,8 @@ class ValorantScraper extends LiquipediaScraper
                     'kills' => 0,
                     'deaths' => 0,
                     'assists' => 0,
-                    'agents' => []
+                    'agents' => [],
+                    'team' => $p['team'] ?? 'Unknown'
                 ];
             }
             $aggregated[$name]['kills'] += $p['kills'];
@@ -231,7 +261,7 @@ class ValorantScraper extends LiquipediaScraper
                 'deaths' => $p['deaths'],
                 'assists' => $p['assists'],
                 'agent' => implode(', ', $p['agents']),
-                'team' => 'Unknown'
+                'team' => $p['team']
             ];
         }
 
