@@ -1,10 +1,11 @@
 <?php require __DIR__ . '/layouts/header.php'; ?>
 
 <!-- Top Bar: Tabs & Actions -->
-<div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-zinc-800 pb-6">
+<div
+    class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 md:mb-8 gap-4 border-b border-zinc-800 pb-6">
 
     <!-- Navigation Tabs -->
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3 w-full lg:w-auto">
         <div class="flex gap-2">
             <a href="."
                 class="px-4 py-2 rounded-sm text-xs font-bold tracking-wider transition-all duration-200 uppercase text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 border border-zinc-700">
@@ -12,60 +13,64 @@
             </a>
         </div>
 
-        <!-- Game Tabs -->
-        <div class="flex bg-zinc-900 p-1 rounded-sm border border-zinc-800 self-start">
-            <?php
-            $tabs = [
-                'all' => 'ALL GAMES',
-                'valorant' => 'VALORANT',
-                'lol' => 'LEAGUE',
-                'cs2' => 'CS2'
-            ];
-            $buildUrl = function ($game = null, $region = null) use ($activeTab, $activeRegion) {
-                $params = [];
-                $g = $game ?? $activeTab;
-                if ($g !== 'all')
-                    $params['game'] = $g;
+        <!-- Game Tabs - Scrollable -->
+        <div class="overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+            <div class="flex bg-zinc-900 p-1 rounded-sm border border-zinc-800 w-max md:w-fit">
+                <?php
+                $tabs = [
+                    'all' => 'ALL GAMES',
+                    'valorant' => 'VALORANT',
+                    'lol' => 'LEAGUE',
+                    'cs2' => 'CS2'
+                ];
+                $buildUrl = function ($game = null, $region = null) use ($activeTab, $activeRegion) {
+                    $params = [];
+                    $g = $game ?? $activeTab;
+                    if ($g !== 'all')
+                        $params['game'] = $g;
 
-                $r = $region ?? $activeRegion;
-                if ($r && $r !== 'all')
-                    $params['region'] = $r;
+                    $r = $region ?? $activeRegion;
+                    if ($r && $r !== 'all')
+                        $params['region'] = $r;
 
-                $queryString = !empty($params) ? '?' . http_build_query($params) : '';
-                return 'teams' . $queryString;
-            };
-            ?>
-            <?php foreach ($tabs as $key => $label): ?>
-                <a href="<?= $buildUrl($key, null) ?>"
-                    class="px-6 py-2 rounded-sm text-xs font-bold tracking-wider transition-all duration-200 uppercase <?= ($activeTab ?? 'all') === $key ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' ?>">
-                    <?= $label ?>
-                </a>
-            <?php endforeach; ?>
+                    $queryString = !empty($params) ? '?' . http_build_query($params) : '';
+                    return 'teams' . $queryString;
+                };
+                ?>
+                <?php foreach ($tabs as $key => $label): ?>
+                    <a href="<?= $buildUrl($key, null) ?>"
+                        class="px-4 md:px-6 py-2 rounded-sm text-xs font-bold tracking-wider transition-all duration-200 uppercase whitespace-nowrap <?= ($activeTab ?? 'all') === $key ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' ?>">
+                        <?= $label ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
         </div>
 
-        <!-- Region Tabs -->
-        <div class="flex gap-2">
-            <?php
-            $regions = [
-                'all' => 'ALL REGIONS',
-                'Americas' => 'AMERICAS',
-                'EMEA' => 'EMEA',
-                'Pacific' => 'PACIFIC',
-                'Other' => 'OTHER'
-            ];
-            ?>
-            <?php foreach ($regions as $key => $label): ?>
-                <?php $isActive = ($activeRegion ?? 'all') === $key; ?>
-                <a href="<?= $buildUrl(null, $key) ?>"
-                    class="px-3 py-1.5 rounded-sm text-[10px] font-bold tracking-wider transition-all duration-200 uppercase border <?= $isActive ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800/50' ?>">
-                    <?= $label ?>
-                </a>
-            <?php endforeach; ?>
+        <!-- Region Tabs - Scrollable -->
+        <div class="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div class="flex gap-2 w-max sm:w-auto">
+                <?php
+                $regions = [
+                    'all' => 'ALL REGIONS',
+                    'Americas' => 'AMERICAS',
+                    'EMEA' => 'EMEA',
+                    'Pacific' => 'PACIFIC',
+                    'Other' => 'OTHER'
+                ];
+                ?>
+                <?php foreach ($regions as $key => $label): ?>
+                    <?php $isActive = ($activeRegion ?? 'all') === $key; ?>
+                    <a href="<?= $buildUrl(null, $key) ?>"
+                        class="px-3 py-1.5 rounded-sm text-[10px] font-bold tracking-wider transition-all duration-200 uppercase border whitespace-nowrap <?= $isActive ? 'bg-zinc-800 text-white border-zinc-600' : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:bg-zinc-800/50' ?>">
+                        <?= $label ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 
     <!-- Info -->
-    <div class="text-right">
+    <div class="text-right flex-shrink-0">
         <span class="text-xs font-mono text-zinc-500">
             <?= count($teams) ?> TEAMS FOUND
         </span>

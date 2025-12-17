@@ -17,7 +17,7 @@
         <!-- Accent Line -->
         <div class="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500"></div>
 
-        <div class="p-8 md:p-12">
+        <div class="p-4 sm:p-6 md:p-8 lg:p-12">
             <!-- Header Info -->
             <div class="text-center mb-16 relative">
                 <div
@@ -38,7 +38,7 @@
                     </div>
 
                     <h2
-                        class="text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 font-black uppercase tracking-wider mb-3 drop-shadow-sm">
+                        class="text-lg sm:text-xl md:text-2xl lg:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 font-black uppercase tracking-wider mb-3 drop-shadow-sm text-center px-2">
                         <?= htmlspecialchars($match['tournament_name']) ?>
                     </h2>
 
@@ -57,7 +57,7 @@
 
                 <!-- Team 1 -->
                 <div class="text-center md:text-right flex-1 w-full group">
-                    <div class="text-4xl md:text-6xl font-black text-white mb-2 break-words leading-tight tracking-tighter group-hover:text-indigo-400 transition-colors duration-300"
+                    <div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-black text-white mb-2 break-words leading-tight tracking-tighter group-hover:text-indigo-400 transition-colors duration-300"
                         title="<?= htmlspecialchars($match['team1_name']) ?>">
                         <?= htmlspecialchars($match['team1_name']) ?>
                     </div>
@@ -80,12 +80,12 @@
                     <?php else: ?>
                         <div class="flex items-center gap-1">
                             <span
-                                class="text-7xl md:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                                class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
                                 <?= $match['team1_score'] ?>
                             </span>
                             <span class="text-4xl font-thin text-zinc-700 mb-2">:</span>
                             <span
-                                class="text-7xl md:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
+                                class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
                                 <?= $match['team2_score'] ?>
                             </span>
                         </div>
@@ -109,7 +109,7 @@
 
                 <!-- Team 2 -->
                 <div class="text-center md:text-left flex-1 w-full group">
-                    <div class="text-4xl md:text-6xl font-black text-white mb-2 break-words leading-tight tracking-tighter group-hover:text-rose-400 transition-colors duration-300"
+                    <div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-black text-white mb-2 break-words leading-tight tracking-tighter group-hover:text-rose-400 transition-colors duration-300"
                         title="<?= htmlspecialchars($match['team2_name']) ?>">
                         <?= htmlspecialchars($match['team2_name']) ?>
                     </div>

@@ -10,7 +10,7 @@ $accentColor = match ($team['game_type']) {
 ?>
 
 <!-- Breadcrumb -->
-<div class="flex items-center gap-2 mb-6 text-sm">
+<div class="flex items-center gap-2 mb-6 text-sm overflow-x-auto scrollbar-hide">
     <a href="." class="text-zinc-500 hover:text-white transition-colors">Home</a>
     <span class="text-zinc-700">/</span>
     <a href="teams?game=<?= $team['game_type'] ?>" class="text-zinc-500 hover:text-white transition-colors">Teams</a>
@@ -39,7 +39,7 @@ $accentColor = match ($team['game_type']) {
         <!-- Info -->
         <div class="flex-1">
             <div class="flex items-center gap-4 mb-4">
-                <h1 class="text-4xl font-black text-white uppercase tracking-tight">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-black text-white uppercase tracking-tight">
                     <?= htmlspecialchars($team['name']) ?>
                 </h1>
                 <span
@@ -65,7 +65,8 @@ $accentColor = match ($team['game_type']) {
 
             <?php if (!empty($team['description'])): ?>
                 <p class="text-zinc-400 text-sm leading-relaxed max-w-3xl">
-                    <?= htmlspecialchars(substr($team['description'], 0, 300)) ?>    <?= strlen($team['description']) > 300 ? '...' : '' ?>
+                    <?= htmlspecialchars(substr($team['description'], 0, 300)) ?>
+                    <?= strlen($team['description']) > 300 ? '...' : '' ?>
                 </p>
             <?php endif; ?>
 
