@@ -5,9 +5,9 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
 ## 📝 Notas / Backlog
 
 - [x] Separar jugadores por equipo en la vista de detalles del partido.
-- [ ] Implementar navegación para ver detalles de equipos y jugadores.
-- [ ] Scraper de información de Equipos (Logos, Historia, Roster actual).
-- [ ] Scraper de información de Jugadores (Biografía, Estadísticas, Historial).
+- [x] Implementar navegación para ver detalles de equipos y jugadores.
+- [x] Scraper de información de Equipos (Logos, Historia, Roster actual).
+- [x] Scraper de información de Jugadores (Biografía, Estadísticas, Historial).
 - [x] Mejorar diseño de la página principal (más agradable, Tailwind).
 - [x] Ordenar tabla de partidos por fecha e Importancia.
 - [x] Implementar VlrScraper híbrido para stats avanzadas (ACS, ADR, KAST, HS%).
@@ -63,14 +63,14 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
 
 ## 🔍 Fase 5: Expansión de Datos (Equipos y Jugadores)
 
-- [ ] **Equipos**
-    - [ ] Crear tabla `teams`.
-    - [ ] Scraper de Equipos (Logo, Nombre, Integrantes).
-    - [ ] Vista de Detalle de Equipo.
-- [ ] **Jugadores**
-    - [ ] Crear tabla `players`.
-    - [ ] Scraper de Jugadores (Foto, Rol, Stats).
-    - [ ] Vista de Detalle de Jugador.
+- [x] **Equipos**
+    - [x] Crear tabla `teams`.
+    - [x] Scraper de Equipos (Logo, Nombre, Integrantes).
+    - [x] Vista de Detalle de Equipo.
+- [x] **Jugadores**
+    - [x] Crear tabla `players`.
+    - [x] Scraper de Jugadores (Foto, Rol, Stats).
+    - [x] Vista de Detalle de Jugador.
 
 ## 🏁 Fase 6: Pruebas y Despliegue
 
