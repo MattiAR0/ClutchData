@@ -55,7 +55,8 @@ class LolScraper extends LiquipediaScraper
                             'team1_score' => $this->extractScore($node, true),
                             'team2_score' => $this->extractScore($node, false),
                             'match_status' => $this->detectStatus($node),
-                            'match_url' => $this->extractMatchUrl($node, '/leagueoflegends/Match:')
+                            'match_url' => $this->extractMatchUrl($node, '/leagueoflegends/Match:'),
+                            'match_importance' => $this->calculateImportance($tournament, $this->detectRegion($tournament))
                         ];
                     }
                 } catch (Exception $e) {

@@ -9,7 +9,8 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
 - [ ] Scraper de información de Equipos (Logos, Historia, Roster actual).
 - [ ] Scraper de información de Jugadores (Biografía, Estadísticas, Historial).
 - [x] Mejorar diseño de la página principal (más agradable, Tailwind).
-- [ ] Ordenar tabla de partidos por fecha.
+- [x] Ordenar tabla de partidos por fecha e Importancia.
+- [x] Implementar VlrScraper híbrido para stats avanzadas (ACS, ADR, KAST, HS%).
 
 ## 🚀 Fase 1: Configuración Inicial (Skeleton)
 

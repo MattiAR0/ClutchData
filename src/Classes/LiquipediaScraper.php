@@ -165,12 +165,57 @@ abstract class LiquipediaScraper implements ScraperInterface
 
         $links = $node->filter('a');
         foreach ($links as $link) {
-            $href = $link->getAttribute('href');
-            if (str_contains($href, $pathPrefix)) {
-                return str_contains($href, 'https') ? $href : 'https://liquipedia.net' . $href;
+            if ($link instanceof \DOMElement) {
+                $href = $link->getAttribute('href');
+                if (str_contains($href, $pathPrefix)) {
+                    return str_contains($href, 'https') ? $href : 'https://liquipedia.net' . $href;
+                }
             }
         }
 
         return null;
+    }
+
+    protected function calculateImportance(string $tournament, string $region): int
+    {
+        $tournament = strtoupper($tournament);
+        $score = 0;
+
+        // Base Region Scores
+        if ($region === 'International')
+            $score = 90;
+        elseif ($region === 'Americas' || $region === 'EMEA' || $region === 'Pacific')
+            $score = 50;
+        else
+            $score = 20;
+
+        // Tier 1 Keywords - Massive Boost
+        if (
+            str_contains($tournament, 'WORLD') ||
+            str_contains($tournament, 'CHAMPIONS') ||
+            str_contains($tournament, 'MAJOR') ||
+            str_contains($tournament, 'MSI') ||
+            str_contains($tournament, 'INVITATIONAL')
+        ) {
+            $score += 50;
+        }
+
+        // Playoff Stages - Boost
+        if (str_contains($tournament, 'FINAL') || str_contains($tournament, 'PLAYOFF')) {
+            $score += 20;
+        }
+
+        // Specific Leagues (LoL/Valo)
+        if (
+            str_contains($tournament, 'LEC') ||
+            str_contains($tournament, 'LCS') ||
+            str_contains($tournament, 'LCK') ||
+            str_contains($tournament, 'LPL') ||
+            str_contains($tournament, 'VCT')
+        ) {
+            $score += 30;
+        }
+
+        return min($score, 200); // Cap at 200
     }
 }

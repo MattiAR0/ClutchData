@@ -362,6 +362,129 @@
                 </div>
             <?php endif; ?>
 
+            <!-- VLR.gg Advanced Statistics -->
+            <?php if (!empty($match['vlr_stats']) && (!empty($match['vlr_stats']['team1']) || !empty($match['vlr_stats']['team2']))): ?>
+                <div class="mb-16">
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                        <h3 class="text-lg font-bold text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                            <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            VLR.gg Advanced Stats
+                        </h3>
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                    </div>
+
+                    <div class="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 mb-6">
+                        <p class="text-xs text-emerald-400/80 text-center font-medium">
+                            📊 Enhanced statistics from VLR.gg • ACS, ADR, KAST, Headshot %
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                        <?php
+                        $vlrTeams = [
+                            ['name' => $match['team1_name'], 'players' => $match['vlr_stats']['team1'] ?? [], 'color' => 'indigo'],
+                            ['name' => $match['team2_name'], 'players' => $match['vlr_stats']['team2'] ?? [], 'color' => 'rose']
+                        ];
+                        foreach ($vlrTeams as $team):
+                            if (empty($team['players']))
+                                continue;
+                            ?>
+                            <div
+                                class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+                                <!-- Team Header -->
+                                <div
+                                    class="px-6 py-4 bg-gradient-to-r from-<?= $team['color'] ?>-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
+                                    <h4 class="text-lg font-black text-white italic tracking-wide">
+                                        <?= htmlspecialchars($team['name']) ?>
+                                    </h4>
+                                    <span
+                                        class="text-xs font-mono text-<?= $team['color'] ?>-400 uppercase px-2 py-1 bg-<?= $team['color'] ?>-500/10 rounded border border-<?= $team['color'] ?>-500/20">
+                                        VLR Stats
+                                    </span>
+                                </div>
+
+                                <!-- Table -->
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left">
+                                        <thead>
+                                            <tr class="border-b border-zinc-800 bg-zinc-900/80">
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                    Player</th>
+                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                    title="Average Combat Score">ACS</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    K</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    D</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    A</th>
+                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                    title="Average Damage per Round">ADR</th>
+                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                    title="Kill/Assist/Survive/Trade %">KAST</th>
+                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                    title="Headshot %">HS%</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-zinc-800/50">
+                                            <?php foreach ($team['players'] as $player): ?>
+                                                <?php
+                                                $acs = $player['acs'] ?? null;
+                                                $acsColor = $acs !== null ? ($acs >= 250 ? 'text-emerald-400' : ($acs >= 200 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+                                                $kast = $player['kast'] ?? null;
+                                                $kastColor = $kast !== null ? ($kast >= 75 ? 'text-emerald-400' : ($kast >= 60 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+                                                ?>
+                                                <tr class="group hover:bg-white/[0.02] transition-colors">
+                                                    <td class="px-4 py-3">
+                                                        <div class="flex items-center gap-2">
+                                                            <?php if (!empty($player['agent'])): ?>
+                                                                <span
+                                                                    class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded"><?= htmlspecialchars($player['agent']) ?></span>
+                                                            <?php endif; ?>
+                                                            <span
+                                                                class="font-bold text-zinc-200 text-sm"><?= htmlspecialchars($player['player_name']) ?></span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $acsColor ?>">
+                                                        <?= $acs !== null ? $acs : '-' ?>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300 font-medium">
+                                                        <?= htmlspecialchars($player['kills'] ?? 0) ?>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">
+                                                        <?= htmlspecialchars($player['deaths'] ?? 0) ?>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">
+                                                        <?= htmlspecialchars($player['assists'] ?? 0) ?>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">
+                                                        <?= $player['adr'] !== null ? number_format($player['adr'], 1) : '-' ?>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm <?= $kastColor ?>">
+                                                        <?= $kast !== null ? number_format($kast, 1) . '%' : '-' ?>
+                                                    </td>
+                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">
+                                                        <?= $player['hs_percent'] !== null ? number_format($player['hs_percent'], 1) . '%' : '-' ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <!-- External Link -->
             <?php if (!empty($match['match_url'])): ?>
                 <div class="text-center">

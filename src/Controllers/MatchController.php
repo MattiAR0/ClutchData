@@ -5,7 +5,9 @@ namespace App\Controllers;
 use App\Classes\ValorantScraper;
 use App\Classes\LolScraper;
 use App\Classes\Cs2Scraper;
+use App\Classes\VlrScraper;
 use App\Models\MatchModel;
+use App\Models\PlayerStatsModel;
 use Exception;
 
 class MatchController
@@ -127,8 +129,51 @@ class MatchController
             }
         }
 
+        // Enriquecer con VLR.gg stats para Valorant
+        $vlrStats = [];
+        if ($match['game_type'] === 'valorant' && $match['match_status'] === 'completed') {
+            try {
+                $playerStatsModel = new PlayerStatsModel($this->model->getConnection());
+
+                // Verificar si ya tenemos stats de VLR
+                if (!$playerStatsModel->hasVlrStats($match['id'])) {
+                    // Intentar obtener stats de VLR.gg
+                    $vlrScraper = new VlrScraper();
+
+                    // Si ya tenemos vlr_match_id, usarlo directamente
+                    if (!empty($match['vlr_match_id'])) {
+                        $vlrDetails = $vlrScraper->scrapeMatchDetails($match['vlr_match_id']);
+                        if (!empty($vlrDetails['players'])) {
+                            $playerStatsModel->saveStats($match['id'], $vlrDetails['players']);
+                        }
+                    } else {
+                        // Buscar por nombres de equipo
+                        $vlrMatchId = $vlrScraper->findMatchByTeams(
+                            $match['team1_name'],
+                            $match['team2_name'],
+                            $match['match_time']
+                        );
+
+                        if ($vlrMatchId) {
+                            $this->model->updateVlrMatchId($match['id'], $vlrMatchId);
+                            $vlrDetails = $vlrScraper->scrapeMatchDetails($vlrMatchId);
+                            if (!empty($vlrDetails['players'])) {
+                                $playerStatsModel->saveStats($match['id'], $vlrDetails['players']);
+                            }
+                        }
+                    }
+                }
+
+                // Obtener stats guardadas
+                $vlrStats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+            } catch (Exception $e) {
+                error_log("Failed to enrich with VLR stats: " . $e->getMessage());
+            }
+        }
+
         // Decode details for view
         $match['details_decoded'] = !empty($match['match_details']) ? json_decode($match['match_details'], true) : [];
+        $match['vlr_stats'] = $vlrStats;
 
         require __DIR__ . '/../../views/match_detail.php';
     }
