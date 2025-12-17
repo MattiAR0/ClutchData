@@ -135,21 +135,9 @@
     </div>
 </div>
 
-<!-- Group, Sort and Render Matches -->
-<?php
-$groupedMatches = [];
-if (!empty($matches)) {
-    foreach ($matches as $match) {
-        $region = $match['match_region'] ?? 'Other';
-        $tournament = $match['tournament_name'];
-        $groupedMatches[$region][$tournament][] = $match;
-    }
-    ksort($groupedMatches);
-}
-?>
-
-<div class="space-y-12">
-    <?php if (empty($groupedMatches)): ?>
+<!-- Matches Grid - Ordered by Date & Importance -->
+<div class="space-y-6">
+    <?php if (empty($matches)): ?>
         <div class="py-20 text-center border border-dashed border-zinc-800 rounded bg-zinc-900/30">
             <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-800 mb-4 text-zinc-600">
                 <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -161,121 +149,128 @@ if (!empty($matches)) {
             <p class="text-zinc-500 text-xs mt-2 font-mono">Execute SYNC to retrieve match data.</p>
         </div>
     <?php else: ?>
-        <?php foreach ($groupedMatches as $region => $tournaments): ?>
-            <div>
-                <!-- Region Header -->
-                <div class="flex items-center gap-4 mb-6">
-                    <h2 class="text-2xl font-black text-white uppercase tracking-tighter">
-                        <?= htmlspecialchars($region) ?>
-                    </h2>
-                    <div class="h-px bg-zinc-800 flex-1"></div>
-                </div>
+        <!-- All Matches Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <?php foreach ($matches as $match): ?>
+                <?php
+                // Professional minimal accents
+                $accentColor = match ($match['game_type']) {
+                    'valorant' => 'bg-rose-500',
+                    'lol' => 'bg-sky-500',
+                    'cs2' => 'bg-amber-500',
+                    default => 'bg-zinc-500'
+                };
 
-                <?php foreach ($tournaments as $tournament => $tournamentMatches): ?>
-                    <div class="mb-10 last:mb-0">
-                        <!-- Tournament Header -->
-                        <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
-                            <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
-                            <?= htmlspecialchars($tournament) ?>
-                        </h3>
+                // Determinar si el resultado debe mostrarse borroso
+                // (completado y NO estamos en la pestaña de completados)
+                $isCompleted = ($match['match_status'] ?? 'upcoming') !== 'upcoming';
+                $shouldBlur = $isCompleted && ($activeStatus ?? 'all') !== 'completed';
+                $matchId = $match['id'];
+                ?>
+                <a href="match?id=<?= $match['id'] ?>"
+                    class="group relative block bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/80 transition-all duration-300 rounded-sm">
+                    <!-- Game Indicator Strip -->
+                    <div
+                        class="absolute left-0 top-0 bottom-0 w-1 <?= $accentColor ?> rounded-l-sm opacity-50 group-hover:opacity-100 transition-opacity">
+                    </div>
 
-                        <!-- Grid -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <?php foreach ($tournamentMatches as $match): ?>
-                                <?php
-                                // Professional minimal accents
-                                $accentColor = match ($match['game_type']) {
-                                    'valorant' => 'bg-rose-500',
-                                    'lol' => 'bg-sky-500',
-                                    'cs2' => 'bg-amber-500',
-                                    default => 'bg-zinc-500'
-                                };
-                                ?>
-                                <a href="match?id=<?= $match['id'] ?>"
-                                    class="group relative block bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/80 transition-all duration-300 rounded-sm">
-                                    <!-- Game Indicator Strip -->
-                                    <div
-                                        class="absolute left-0 top-0 bottom-0 w-1 <?= $accentColor ?> rounded-l-sm opacity-50 group-hover:opacity-100 transition-opacity">
-                                    </div>
+                    <div class="p-5 pl-7">
+                        <!-- Header -->
+                        <div class="flex justify-between items-start mb-6">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
+                                    <?= $match['game_type'] ?>
+                                </span>
+                                <span class="text-[10px] text-zinc-600 mt-1">
+                                    <?= htmlspecialchars($match['match_region'] ?? 'Other') ?>
+                                </span>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <!-- Date & Time -->
+                                <span class="text-xs font-bold text-zinc-300">
+                                    <?= date('M j', strtotime($match['match_time'])) ?>
+                                </span>
+                                <span class="text-[10px] font-mono text-zinc-500">
+                                    <?= date('H:i', strtotime($match['match_time'])) ?> UTC
+                                </span>
+                            </div>
+                        </div>
 
-                                    <div class="p-5 pl-7">
-                                        <!-- Header -->
-                                        <div class="flex justify-between items-start mb-6">
-                                            <span class="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
-                                                <?= $match['game_type'] ?>
+                        <!-- Teams -->
+                        <div class="flex items-center justify-between gap-2 mb-6">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-bold text-base sm:text-lg text-white truncate group-hover:text-indigo-400 transition-colors"
+                                    title="<?= htmlspecialchars($match['team1_name']) ?>">
+                                    <?= htmlspecialchars($match['team1_name']) ?>
+                                </h3>
+                            </div>
+                            <div class="text-center flex-shrink-0 px-2">
+                                <?php if (($match['match_status'] ?? 'upcoming') === 'upcoming'): ?>
+                                    <span class="text-zinc-700 text-xs tracking-widest font-black">VS</span>
+                                <?php else: ?>
+                                    <div class="flex flex-col items-center relative">
+                                        <!-- Score con blur condicional -->
+                                        <div id="score-<?= $matchId ?>" class="relative">
+                                            <span
+                                                class="text-lg sm:text-xl font-black text-white tracking-wider whitespace-nowrap transition-all duration-300 <?= $shouldBlur ? 'blur-sm select-none' : '' ?>"
+                                                data-blurred="<?= $shouldBlur ? 'true' : 'false' ?>">
+                                                <?= $match['team1_score'] ?? 0 ?> - <?= $match['team2_score'] ?? 0 ?>
                                             </span>
-                                            <div class="flex flex-col items-end">
-                                                <!-- Date & Time -->
-                                                <span class="text-xs font-bold text-zinc-300">
-                                                    <?= date('M j', strtotime($match['match_time'])) ?>
-                                                </span>
-                                                <span class="text-[10px] font-mono text-zinc-500">
-                                                    <?= date('H:i', strtotime($match['match_time'])) ?> UTC
-                                                </span>
-                                            </div>
+                                            <?php if ($shouldBlur): ?>
+                                                <!-- Botón para revelar resultado -->
+                                                <button type="button"
+                                                    onclick="event.preventDefault(); event.stopPropagation(); toggleSpoiler(<?= $matchId ?>);"
+                                                    class="absolute inset-0 flex items-center justify-center bg-zinc-800/80 rounded transition-opacity hover:bg-zinc-700/80"
+                                                    id="reveal-btn-<?= $matchId ?>" title="Revelar resultado">
+                                                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
-
-                                        <!-- Teams -->
-                                        <div class="flex items-center justify-between gap-2 mb-6">
-                                            <div class="flex-1 min-w-0">
-                                                <h3 class="font-bold text-base sm:text-lg text-white truncate group-hover:text-indigo-400 transition-colors"
-                                                    title="<?= htmlspecialchars($match['team1_name']) ?>">
-                                                    <?= htmlspecialchars($match['team1_name']) ?>
-                                                </h3>
-                                            </div>
-                                            <div class="text-center flex-shrink-0 px-2">
-                                                <?php if (($match['match_status'] ?? 'upcoming') === 'upcoming'): ?>
-                                                    <span class="text-zinc-700 text-xs tracking-widest font-black">VS</span>
-                                                <?php else: ?>
-                                                    <div class="flex flex-col items-center">
-                                                        <span
-                                                            class="text-lg sm:text-xl font-black text-white tracking-wider whitespace-nowrap">
-                                                            <?= $match['team1_score'] ?? 0 ?> - <?= $match['team2_score'] ?? 0 ?>
-                                                        </span>
-                                                        <?php if (($match['match_status'] ?? '') === 'live'): ?>
-                                                            <span
-                                                                class="text-[10px] font-bold text-rose-500 uppercase animate-pulse">LIVE</span>
-                                                        <?php else: ?>
-                                                            <span class="text-[10px] font-bold text-zinc-500 uppercase">FINAL</span>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="flex-1 min-w-0 text-right">
-                                                <h3 class="font-bold text-base sm:text-lg text-white truncate group-hover:text-indigo-400 transition-colors"
-                                                    title="<?= htmlspecialchars($match['team2_name']) ?>">
-                                                    <?= htmlspecialchars($match['team2_name']) ?>
-                                                </h3>
-                                            </div>
-                                        </div>
-
-                                        <!-- Footer / Stats -->
-                                        <div class="flex justify-between items-end border-t border-zinc-800 pt-4 mt-2">
-                                            <div class="flex flex-col">
-                                                <span class="text-[10px] text-zinc-600 uppercase tracking-wider mb-1">League</span>
-                                                <span class="text-xs text-zinc-300 truncate max-w-[140px]"
-                                                    title="<?= htmlspecialchars($match['tournament_name']) ?>">
-                                                    <?= htmlspecialchars($match['tournament_name']) ?>
-                                                </span>
-                                            </div>
-
-                                            <div class="text-right">
-                                                <span class="text-[10px] text-zinc-600 uppercase tracking-wider block mb-1">Win
-                                                    Prob</span>
-                                                <span class="text-lg font-mono font-bold text-white">
-                                                    <?= number_format($match['ai_prediction'], 0) ?><span
-                                                        class="text-indigo-500 text-sm">%</span>
-                                                </span>
-                                            </div>
-                                        </div>
+                                        <?php if (($match['match_status'] ?? '') === 'live'): ?>
+                                            <span class="text-[10px] font-bold text-rose-500 uppercase animate-pulse">LIVE</span>
+                                        <?php else: ?>
+                                            <span class="text-[10px] font-bold text-zinc-500 uppercase">FINAL</span>
+                                        <?php endif; ?>
                                     </div>
-                                </a>
-                            <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                            <div class="flex-1 min-w-0 text-right">
+                                <h3 class="font-bold text-base sm:text-lg text-white truncate group-hover:text-indigo-400 transition-colors"
+                                    title="<?= htmlspecialchars($match['team2_name']) ?>">
+                                    <?= htmlspecialchars($match['team2_name']) ?>
+                                </h3>
+                            </div>
+                        </div>
+
+                        <!-- Footer / Stats -->
+                        <div class="flex justify-between items-end border-t border-zinc-800 pt-4 mt-2">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-zinc-600 uppercase tracking-wider mb-1">League</span>
+                                <span class="text-xs text-zinc-300 truncate max-w-[140px]"
+                                    title="<?= htmlspecialchars($match['tournament_name']) ?>">
+                                    <?= htmlspecialchars($match['tournament_name']) ?>
+                                </span>
+                            </div>
+
+                            <div class="text-right">
+                                <span class="text-[10px] text-zinc-600 uppercase tracking-wider block mb-1">Win
+                                    Prob</span>
+                                <span class="text-lg font-mono font-bold text-white">
+                                    <?= number_format($match['ai_prediction'], 0) ?><span
+                                        class="text-indigo-500 text-sm">%</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endforeach; ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
     <?php endif; ?>
 </div>
 

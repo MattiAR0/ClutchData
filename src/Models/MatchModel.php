@@ -78,7 +78,7 @@ class MatchModel
             $sql .= " WHERE " . implode(" AND ", $conditions);
         }
 
-        // Updated sorting: Importance first.
+        // Updated sorting: Date first, then importance.
         // If status is UPCOMING, we want match_time ASC (Nearest first)
         // If status is COMPLETED or ALL, we want match_time DESC (Newest first)
 
@@ -87,7 +87,7 @@ class MatchModel
             $dateSort = 'ASC';
         }
 
-        $sql .= " ORDER BY match_importance DESC, match_time " . $dateSort;
+        $sql .= " ORDER BY match_time " . $dateSort . ", match_importance DESC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
