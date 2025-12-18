@@ -48,7 +48,20 @@ class MatchController
 
     public function scrape()
     {
+        $force = isset($_GET['force']) && $_GET['force'] === '1';
+
         try {
+            // Check if we already have cached data
+            if (!$force && $this->model->hasCachedMatches()) {
+                $count = $this->model->getMatchCount();
+                $_SESSION['message'] = "Mostrando $count partidos de la caché. <a href='?action=scrape&force=1' class='underline'>Forzar actualización</a>";
+
+                // Just redirect without scraping
+                $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/';
+                header('Location: ' . $redirectUrl);
+                exit;
+            }
+
             // Limpiar datos antiguos antes de scrapear
             $this->model->deleteAllMatches();
 
@@ -59,12 +72,20 @@ class MatchController
                 new Cs2Scraper()
             ];
 
+            $totalMatches = 0;
             foreach ($scrapers as $scraper) {
                 $data = $scraper->scrapeMatches();
-                $this->model->saveMatches($data);
+                if (!empty($data)) {
+                    $this->model->saveMatches($data);
+                    $totalMatches += count($data);
+                }
             }
 
-            $_SESSION['message'] = "Scraping completado exitosamente.";
+            if ($totalMatches > 0) {
+                $_SESSION['message'] = "Scraping completado: $totalMatches partidos obtenidos.";
+            } else {
+                $_SESSION['error'] = "Scraping completado pero no se obtuvieron partidos. Liquipedia puede estar limitando las peticiones. Intenta de nuevo en unos minutos.";
+            }
         } catch (Exception $e) {
             $_SESSION['error'] = "Error durante el scraping: " . $e->getMessage();
         }

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Classes;
 
 use App\Interfaces\ScraperInterface;
+use App\Exceptions\ScrapingException;
 use GuzzleHttp\Client;
 use Symfony\Component\DomCrawler\Crawler;
 
 abstract class LiquipediaScraper implements ScraperInterface
 {
     protected Client $client;
+    protected ?LiquipediaAPI $api = null;
+    protected bool $useApiFallback = true;
     protected string $baseUrl = 'https://liquipedia.net';
 
     public function __construct()
@@ -26,48 +29,118 @@ abstract class LiquipediaScraper implements ScraperInterface
         ]);
     }
 
+    /**
+     * Get or create the API client for fallback requests.
+     */
+    protected function getApi(): LiquipediaAPI
+    {
+        if ($this->api === null) {
+            $this->api = new LiquipediaAPI();
+        }
+        return $this->api;
+    }
+
     abstract public function getGameType(): string;
     abstract public function scrapeMatchDetails(string $url): array;
 
     protected function fetch(string $uri): string
     {
-        $maxRetries = 3;
-        $retryDelay = 5; // Start with 5 seconds
+        $maxRetries = 2; // Reduced from 3 for faster fallback
+        $retryDelay = 2; // Reduced from 5 seconds
+        $lastError = null;
 
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
-                // Add a courtesy delay between requests (Liquipedia requires this)
+                // Add a courtesy delay between retries (not on first attempt)
                 if ($attempt > 1) {
                     sleep($retryDelay);
-                    $retryDelay *= 2; // Exponential backoff
                 }
 
                 $response = $this->client->request('GET', $uri);
 
-                // Success - add small delay before next potential request
-                usleep(2000000); // 2 seconds courtesy delay
+                // Success - small delay before next potential request
+                usleep(1000000); // 1 second courtesy delay
 
                 return (string) $response->getBody();
             } catch (\GuzzleHttp\Exception\ClientException $e) {
                 $statusCode = $e->getResponse()->getStatusCode();
+                $lastError = $e;
 
-                if ($statusCode === 429 && $attempt < $maxRetries) {
-                    // Rate limited - wait and retry
-                    error_log("Liquipedia rate limited (429), waiting {$retryDelay}s before retry $attempt/$maxRetries");
-                    sleep($retryDelay);
-                    $retryDelay *= 2;
-                    continue;
+                if ($statusCode === 429) {
+                    // Rate limited - go directly to API fallback
+                    error_log("Liquipedia rate limited (429), trying API fallback");
+                    break; // Exit loop immediately to try API
                 }
 
                 error_log("Liquipedia fetch error for $uri: " . $e->getMessage());
-                return '';
             } catch (\Exception $e) {
+                $lastError = $e;
                 error_log("Liquipedia fetch error for $uri: " . $e->getMessage());
-                return '';
             }
         }
 
+        // Try API fallback if enabled
+        if ($this->useApiFallback) {
+            return $this->fetchViaApi($uri);
+        }
+
         return '';
+    }
+
+    /**
+     * Fallback method to fetch page content via the MediaWiki API.
+     * Used when direct scraping fails due to rate limiting or other errors.
+     *
+     * @param string $uri The URI path that was being fetched
+     * @return string HTML content or empty string on failure
+     */
+    protected function fetchViaApi(string $uri): string
+    {
+        try {
+            error_log("Attempting API fallback for: $uri");
+
+            $game = $this->getGameType();
+
+            // Extract page name from URI
+            // e.g., /valorant/Liquipedia:Matches -> Liquipedia:Matches
+            // e.g., /valorant/Match:12345 -> Match:12345
+            $pageName = $this->extractPageName($uri);
+
+            if (empty($pageName)) {
+                error_log("Could not extract page name from URI: $uri");
+                return '';
+            }
+
+            $html = $this->getApi()->getPageHtml($game, $pageName);
+
+            if (!empty($html)) {
+                error_log("API fallback successful for: $uri");
+                return $html;
+            }
+        } catch (ScrapingException $e) {
+            error_log("API fallback failed: " . $e->getMessage());
+        } catch (\Exception $e) {
+            error_log("API fallback error: " . $e->getMessage());
+        }
+
+        return '';
+    }
+
+    /**
+     * Extract the page name from a Liquipedia URI path.
+     *
+     * @param string $uri URI path (e.g., /valorant/Liquipedia:Matches)
+     * @return string Page name (e.g., Liquipedia:Matches)
+     */
+    protected function extractPageName(string $uri): string
+    {
+        // Remove leading slash
+        $uri = ltrim($uri, '/');
+
+        // Split by slash and get everything after the game portion
+        $parts = explode('/', $uri, 2);
+
+        return $parts[1] ?? '';
     }
 
     protected function detectRegion(string $tournamentName): string

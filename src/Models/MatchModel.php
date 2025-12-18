@@ -125,6 +125,34 @@ class MatchModel
     }
 
     /**
+     * Get the count of matches in the database
+     */
+    public function getMatchCount(): int
+    {
+        $stmt = $this->db->query("SELECT COUNT(*) FROM matches");
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Check if we have cached matches (at least some data in DB)
+     */
+    public function hasCachedMatches(): bool
+    {
+        return $this->getMatchCount() > 0;
+    }
+
+    /**
+     * Get the most recent match_time from the database
+     * This helps determine if data is "fresh" enough
+     */
+    public function getNewestMatchTime(): ?string
+    {
+        $stmt = $this->db->query("SELECT MAX(match_time) FROM matches");
+        $result = $stmt->fetchColumn();
+        return $result ?: null;
+    }
+
+    /**
      * Actualiza el vlr_match_id de un partido
      */
     public function updateVlrMatchId(int $id, string $vlrMatchId): void
