@@ -198,6 +198,96 @@ class MatchController
         $match['details_decoded'] = !empty($match['match_details']) ? json_decode($match['match_details'], true) : [];
         $match['vlr_stats'] = $vlrStats;
 
+        // Merge stats from both sources (VLR prioritized, Liquipedia as fallback)
+        $match['merged_stats'] = $this->mergePlayerStats($match);
+
         require __DIR__ . '/../../views/match_detail.php';
+    }
+
+    /**
+     * Merge player stats from VLR.gg and Liquipedia into unified format
+     * VLR stats are prioritized (more complete: ACS, ADR, KAST, HS%)
+     * Liquipedia stats used as fallback
+     */
+    private function mergePlayerStats(array $match): array
+    {
+        $mergedByTeam = [];
+        $team1Name = $match['team1_name'];
+        $team2Name = $match['team2_name'];
+
+        // Initialize teams
+        $mergedByTeam[$team1Name] = [];
+        $mergedByTeam[$team2Name] = [];
+
+        // First, add VLR stats (prioritized source - more complete data)
+        $vlrStats = $match['vlr_stats'] ?? [];
+        $vlrTeam1 = $vlrStats['team1'] ?? [];
+        $vlrTeam2 = $vlrStats['team2'] ?? [];
+
+        foreach ($vlrTeam1 as $player) {
+            $mergedByTeam[$team1Name][] = [
+                'name' => $player['player_name'] ?? $player['name'] ?? 'Unknown',
+                'agent' => $player['agent'] ?? null,
+                'kills' => $player['kills'] ?? 0,
+                'deaths' => $player['deaths'] ?? 0,
+                'assists' => $player['assists'] ?? 0,
+                'acs' => $player['acs'] ?? null,
+                'adr' => $player['adr'] ?? null,
+                'kast' => $player['kast'] ?? null,
+                'hs_percent' => $player['hs_percent'] ?? null,
+                'first_bloods' => $player['first_bloods'] ?? null,
+                'data_source' => 'vlr'
+            ];
+        }
+
+        foreach ($vlrTeam2 as $player) {
+            $mergedByTeam[$team2Name][] = [
+                'name' => $player['player_name'] ?? $player['name'] ?? 'Unknown',
+                'agent' => $player['agent'] ?? null,
+                'kills' => $player['kills'] ?? 0,
+                'deaths' => $player['deaths'] ?? 0,
+                'assists' => $player['assists'] ?? 0,
+                'acs' => $player['acs'] ?? null,
+                'adr' => $player['adr'] ?? null,
+                'kast' => $player['kast'] ?? null,
+                'hs_percent' => $player['hs_percent'] ?? null,
+                'first_bloods' => $player['first_bloods'] ?? null,
+                'data_source' => 'vlr'
+            ];
+        }
+
+        // If no VLR stats, use Liquipedia stats as fallback
+        if (empty($mergedByTeam[$team1Name]) && empty($mergedByTeam[$team2Name])) {
+            $liquipediaPlayers = $match['details_decoded']['players'] ?? [];
+
+            foreach ($liquipediaPlayers as $player) {
+                $teamName = $player['team'] ?? 'Unknown';
+                // Match to team1 or team2
+                if (stripos($teamName, $team1Name) !== false || stripos($team1Name, $teamName) !== false) {
+                    $targetTeam = $team1Name;
+                } elseif (stripos($teamName, $team2Name) !== false || stripos($team2Name, $teamName) !== false) {
+                    $targetTeam = $team2Name;
+                } else {
+                    // Fallback: first 5 players to team1, rest to team2
+                    $targetTeam = count($mergedByTeam[$team1Name]) < 5 ? $team1Name : $team2Name;
+                }
+
+                $mergedByTeam[$targetTeam][] = [
+                    'name' => $player['name'] ?? 'Unknown',
+                    'agent' => $player['agent'] ?? null,
+                    'kills' => $player['kills'] ?? 0,
+                    'deaths' => $player['deaths'] ?? 0,
+                    'assists' => $player['assists'] ?? 0,
+                    'acs' => null, // Not available from Liquipedia
+                    'adr' => null,
+                    'kast' => null,
+                    'hs_percent' => null,
+                    'first_bloods' => null,
+                    'data_source' => 'liquipedia'
+                ];
+            }
+        }
+
+        return $mergedByTeam;
     }
 }

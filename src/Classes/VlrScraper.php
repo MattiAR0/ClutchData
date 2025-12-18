@@ -53,7 +53,10 @@ class VlrScraper implements ScraperInterface
         if ($this->lastRequestTime !== null) {
             $elapsed = (microtime(true) - $this->lastRequestTime) * 1000;
             if ($elapsed < $this->requestDelayMs) {
-                usleep(($this->requestDelayMs - $elapsed) * 1000);
+                $sleepTime = (int) max(0, ($this->requestDelayMs - $elapsed) * 1000);
+                if ($sleepTime > 0) {
+                    usleep($sleepTime);
+                }
             }
         }
         $this->lastRequestTime = microtime(true);
