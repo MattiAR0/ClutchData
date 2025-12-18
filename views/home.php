@@ -267,6 +267,34 @@
                                 </span>
                             </div>
                         </div>
+
+                        <!-- Stats Availability Indicators -->
+                        <?php
+                        // Details are available if we have a source URL (fetched on demand)
+                        $hasDetails = !empty($match['match_url']);
+                        // VLR stats require a VLR ID (fetched during scrape or on demand)
+                        $hasVlr = !empty($match['vlr_match_id']);
+                        ?>
+                        <?php if ($hasDetails || $hasVlr): ?>
+                            <div class="mt-3 flex gap-2 pt-3 border-t border-zinc-800/50">
+                                <?php if ($hasDetails): ?>
+                                    <span class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20" title="Full stats available">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        Stats
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($hasVlr): ?>
+                                    <span class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20" title="Advanced VLR.gg metrics">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        VLR Data
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </a>
             <?php endforeach; ?>

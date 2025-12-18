@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS matches (
     ai_prediction FLOAT DEFAULT NULL,
     match_importance INT DEFAULT 0,
     vlr_match_id VARCHAR(50) DEFAULT NULL,
+    match_details JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

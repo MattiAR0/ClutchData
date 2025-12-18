@@ -121,7 +121,11 @@ class MatchModel
 
     public function deleteAllMatches(): void
     {
+        // Disable foreign key checks to allow truncation
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $this->db->exec("TRUNCATE TABLE player_stats");
         $this->db->exec("TRUNCATE TABLE matches");
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
 
     /**
