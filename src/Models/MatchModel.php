@@ -72,22 +72,28 @@ class MatchModel
             } elseif ($status === 'completed') {
                 $conditions[] = "match_status != 'upcoming'"; // Covers 'completed', 'live'
             }
+        } else {
+            // ANY STATUS: Show upcoming matches + completed only from today
+            $conditions[] = "(match_status = 'upcoming' OR (match_status != 'upcoming' AND DATE(match_time) = CURDATE()))";
         }
 
         if (!empty($conditions)) {
             $sql .= " WHERE " . implode(" AND ", $conditions);
         }
 
-        // Updated sorting: Date first, then importance.
-        // If status is UPCOMING, we want match_time ASC (Nearest first)
-        // If status is COMPLETED or ALL, we want match_time DESC (Newest first)
+        // Sorting logic:
+        // If status is UPCOMING, we want match_time ASC (Nearest future first)
+        // If status is COMPLETED, we want match_time DESC (Most recent completed first)
+        // If status is ALL, show upcoming first (sorted by nearest), then today's completed
 
-        $dateSort = 'DESC';
         if ($status === 'upcoming') {
-            $dateSort = 'ASC';
+            $sql .= " ORDER BY match_time ASC, match_importance DESC";
+        } elseif ($status === 'completed') {
+            $sql .= " ORDER BY match_time DESC, match_importance DESC";
+        } else {
+            // ANY STATUS: Upcoming first (by nearest time), then completed from today
+            $sql .= " ORDER BY (match_status = 'upcoming') DESC, match_time ASC, match_importance DESC";
         }
-
-        $sql .= " ORDER BY match_time " . $dateSort . ", match_importance DESC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
