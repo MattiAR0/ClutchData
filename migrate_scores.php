@@ -11,7 +11,9 @@ try {
         'team2_score' => "INT DEFAULT NULL",
         'match_status' => "ENUM('upcoming', 'live', 'completed') DEFAULT 'upcoming'",
         'match_url' => "VARCHAR(512) DEFAULT NULL",
-        'bo_type' => "VARCHAR(20) DEFAULT NULL"
+        'bo_type' => "VARCHAR(20) DEFAULT NULL",
+        'match_importance' => "INT DEFAULT 0",
+        'vlr_match_id' => "VARCHAR(50) DEFAULT NULL"
     ];
 
     foreach ($columns as $colName => $colDef) {
@@ -25,7 +27,6 @@ try {
     }
 
     echo "Migration completed.\n";
-
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }

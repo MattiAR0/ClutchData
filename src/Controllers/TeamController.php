@@ -40,8 +40,9 @@ class TeamController
             // Get teams from database
             $teams = $this->teamModel->getAllTeams($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null);
 
-            // If no teams in DB, get unique teams from matches
-            if (empty($teams)) {
+            // If no teams in DB (completely empty table), get unique teams from matches
+            // We verify hasAnyTeams() to avoid fallback when a FILTER returns empty results but DB has data
+            if (empty($teams) && !$this->teamModel->hasAnyTeams()) {
                 $matchTeams = $this->teamModel->getTeamsFromMatches($gameType !== 'all' ? $gameType : null);
                 // Convert to display format (now includes region from match data)
                 $teams = array_map(fn($t) => [
@@ -229,7 +230,6 @@ class TeamController
 
                     // Rate limiting - 2 seconds between requests
                     sleep(2);
-
                 } catch (Exception $e) {
                     $failed++;
                     $errors[] = "$teamName: " . $e->getMessage();
@@ -249,7 +249,6 @@ class TeamController
             if (!empty($errors) && count($errors) <= 5) {
                 $_SESSION['error'] = "Failed teams: " . implode(', ', $errors);
             }
-
         } catch (Exception $e) {
             $_SESSION['error'] = "Sync error: " . $e->getMessage();
         }
@@ -265,103 +264,126 @@ class TeamController
 
     /**
      * Sync regions for all teams that have "Other" region
-     * This scrapes Liquipedia to get the correct region for each team
+     * Uses match data to infer regions (excludes international tournaments)
      */
     public function syncRegions(): void
     {
-        // Extend execution time for this long-running process
-        set_time_limit(300); // 5 minutes max
-
         $gameFilter = $_GET['game'] ?? null;
-        $limit = (int) ($_GET['limit'] ?? 10); // Default to 10 teams per sync (to avoid timeout)
+        $db = $this->teamModel->getConnection();
 
-        $scraper = new TeamScraper();
+        // Regiones válidas (no internacionales)
+        $validRegions = ['Americas', 'EMEA', 'Pacific'];
+        $internationalRegions = ['International', 'World', 'Global', 'Worldwide'];
+
         $updated = 0;
-        $failed = 0;
+        $created = 0;
         $skipped = 0;
-        $errors = [];
 
         try {
-            // Get all unique teams from matches that have "Other" region
-            $teamsToUpdate = $this->getTeamsWithOtherRegion($gameFilter);
+            // Paso 1: Obtener la región más frecuente para cada equipo+juego
+            // basándose en partidos regionales (excluyendo internacionales)
+            $gameCondition = '';
+            $params = [];
+            if ($gameFilter && $gameFilter !== 'all') {
+                $gameCondition = 'AND game_type = :game_type';
+                $params['game_type'] = $gameFilter;
+            }
 
-            foreach ($teamsToUpdate as $teamData) {
-                if ($updated >= $limit) {
-                    break; // Limit reached
+            $sql = "
+                SELECT 
+                    team_name,
+                    game_type,
+                    match_region,
+                    COUNT(*) as match_count
+                FROM (
+                    SELECT team1_name as team_name, game_type, match_region
+                    FROM matches 
+                    WHERE match_region IS NOT NULL 
+                      AND match_region != 'Other'
+                      AND match_region NOT IN ('International', 'World', 'Global', 'Worldwide')
+                      AND match_region IN ('Americas', 'EMEA', 'Pacific')
+                      $gameCondition
+                    
+                    UNION ALL
+                    
+                    SELECT team2_name as team_name, game_type, match_region
+                    FROM matches 
+                    WHERE match_region IS NOT NULL 
+                      AND match_region != 'Other'
+                      AND match_region NOT IN ('International', 'World', 'Global', 'Worldwide')
+                      AND match_region IN ('Americas', 'EMEA', 'Pacific')
+                      $gameCondition
+                ) as all_team_matches
+                WHERE team_name IS NOT NULL 
+                  AND team_name != '' 
+                  AND team_name != 'TBD' 
+                  AND team_name != 'TBA'
+                GROUP BY team_name, game_type, match_region
+                ORDER BY team_name, game_type, match_count DESC
+            ";
+
+            $stmt = $db->prepare($sql);
+
+            // Bind parameters for both UNION parts
+            if ($gameFilter && $gameFilter !== 'all') {
+                $stmt->execute(['game_type' => $gameFilter]);
+            } else {
+                $stmt->execute();
+            }
+
+            $regionData = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Paso 2: Agrupar por equipo+juego (tomar la región más frecuente)
+            $teamRegions = [];
+            foreach ($regionData as $row) {
+                $key = $row['team_name'] . '|' . $row['game_type'];
+                if (!isset($teamRegions[$key])) {
+                    $teamRegions[$key] = [
+                        'team_name' => $row['team_name'],
+                        'game_type' => $row['game_type'],
+                        'region' => $row['match_region'],
+                        'match_count' => $row['match_count']
+                    ];
                 }
+            }
 
-                $teamName = $teamData['name'];
-                $gameType = $teamData['game_type'];
+            // Paso 3: Actualizar equipos
+            foreach ($teamRegions as $data) {
+                $existing = $this->teamModel->getTeamByNameAndGame($data['team_name'], $data['game_type']);
 
-                // Skip TBD and placeholder names
-                if (in_array(strtoupper($teamName), ['TBD', 'TBA', 'UNKNOWN', '???'])) {
-                    continue;
-                }
-
-                try {
-                    // Scrape team data from Liquipedia
-                    $scrapedData = $scraper->scrapeTeam($teamName, $gameType);
-
-                    if ($scrapedData && $scrapedData['region'] !== 'Other') {
-                        // Update the team in database if it exists
-                        $existing = $this->teamModel->getTeamByNameAndGame($teamName, $gameType);
-
-                        if ($existing) {
-                            // Update existing team's region
-                            $this->teamModel->updateTeam($existing['id'], [
-                                'region' => $scrapedData['region'],
-                                'country' => $scrapedData['country'] ?? $existing['country'],
-                                'logo_url' => $scrapedData['logo_url'] ?? $existing['logo_url'],
-                                'description' => $scrapedData['description'] ?? $existing['description'],
-                                'liquipedia_url' => $scrapedData['liquipedia_url'] ?? $existing['liquipedia_url']
-                            ]);
-                        } else {
-                            // Create new team entry with correct region
-                            $this->teamModel->saveTeam([
-                                'name' => $scrapedData['name'],
-                                'game_type' => $scrapedData['game_type'],
-                                'region' => $scrapedData['region'],
-                                'country' => $scrapedData['country'],
-                                'logo_url' => $scrapedData['logo_url'],
-                                'description' => $scrapedData['description'],
-                                'liquipedia_url' => $scrapedData['liquipedia_url']
-                            ]);
-                        }
-
-                        // Also update the region in the matches table for this team
-                        $this->updateMatchRegionsForTeam($teamName, $gameType, $scrapedData['region']);
-
+                if ($existing) {
+                    // Solo actualizar si tiene 'Other' o NULL
+                    if ($existing['region'] === 'Other' || $existing['region'] === null) {
+                        $this->teamModel->updateTeam($existing['id'], [
+                            'region' => $data['region'],
+                            'country' => $existing['country'],
+                            'logo_url' => $existing['logo_url'],
+                            'description' => $existing['description'],
+                            'liquipedia_url' => $existing['liquipedia_url']
+                        ]);
                         $updated++;
                     } else {
-                        // Still "Other" or scraping failed
                         $skipped++;
                     }
-
-                    // Rate limiting - 2 seconds between requests
-                    sleep(2);
-
-                } catch (Exception $e) {
-                    $failed++;
-                    $errors[] = "$teamName: " . $e->getMessage();
+                } else {
+                    // Crear nuevo equipo
+                    $this->teamModel->saveTeam([
+                        'name' => $data['team_name'],
+                        'game_type' => $data['game_type'],
+                        'region' => $data['region']
+                    ]);
+                    $created++;
                 }
             }
 
             // Set session message
-            $message = "✅ Updated regions for $updated teams";
+            $message = "✅ Regiones sincronizadas: $updated actualizados, $created creados";
             if ($skipped > 0) {
-                $message .= " (skipped $skipped with no better region found)";
-            }
-            if ($failed > 0) {
-                $message .= " | ❌ Failed: $failed";
+                $message .= " ($skipped ya tenían región)";
             }
             $_SESSION['message'] = $message;
-
-            if (!empty($errors) && count($errors) <= 5) {
-                $_SESSION['error'] = "Failed teams: " . implode(', ', $errors);
-            }
-
         } catch (Exception $e) {
-            $_SESSION['error'] = "Sync regions error: " . $e->getMessage();
+            $_SESSION['error'] = "Error sincronizando regiones: " . $e->getMessage();
         }
 
         // Redirect back to teams page

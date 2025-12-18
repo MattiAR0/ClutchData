@@ -42,8 +42,12 @@ class TeamModel
         }
 
         if ($region && $region !== 'all') {
-            $sql .= " AND region = :region";
-            $params['region'] = $region;
+            if ($region === 'Other') {
+                $sql .= " AND region NOT IN ('Americas', 'EMEA', 'Pacific')";
+            } else {
+                $sql .= " AND region = :region";
+                $params['region'] = $region;
+            }
         }
 
         $sql .= " ORDER BY name ASC";
@@ -202,5 +206,11 @@ class TeamModel
         $stmt->execute();
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function hasAnyTeams(): bool
+    {
+        $stmt = $this->db->query("SELECT 1 FROM teams LIMIT 1");
+        return (bool) $stmt->fetch();
     }
 }
