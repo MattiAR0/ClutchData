@@ -9,6 +9,7 @@ use App\Classes\Router;
 use App\Controllers\MatchController;
 use App\Controllers\TeamController;
 use App\Controllers\PlayerController;
+use App\Controllers\ApiController;
 use Dotenv\Dotenv;
 
 // Cargar variables de entorno
@@ -45,6 +46,16 @@ $router->get('/team', [TeamController::class, 'show']);
 // Definir Rutas - Players
 $router->get('/player', [PlayerController::class, 'show']);
 
+// ============================================
+// API REST Endpoints (Fase 4 - Interoperabilidad)
+// ============================================
+$router->get('/api/matches', [ApiController::class, 'getMatches']);
+$router->get('/api/match', [ApiController::class, 'getMatch']);
+$router->get('/api/teams', [ApiController::class, 'getTeams']);
+$router->get('/api/team', [ApiController::class, 'getTeam']);
+$router->get('/api/stats', [ApiController::class, 'getStats']);
+
 // Resolver Ruta Actual
 $router->resolve();
+
 
