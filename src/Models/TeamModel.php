@@ -135,29 +135,38 @@ class TeamModel
     }
 
     /**
-     * Get teams that appear in matches
+     * Get teams that appear in matches (includes region from match data)
      */
     public function getTeamsFromMatches(?string $gameType = null): array
     {
-        $sql = "
-            SELECT DISTINCT team1_name as name, game_type FROM matches
-            UNION
-            SELECT DISTINCT team2_name as name, game_type FROM matches
+        // Use a subquery to get all team-game-region combinations, then group to avoid duplicates
+        // When a team appears in multiple regions, prefer the most common one (using MAX as simple tie-breaker)
+        $baseQuery = "
+            SELECT team1_name as name, game_type, match_region as region FROM matches
+            UNION ALL
+            SELECT team2_name as name, game_type, match_region as region FROM matches
         ";
 
         if ($gameType && $gameType !== 'all') {
-            $sql = "
-                SELECT DISTINCT team1_name as name, game_type FROM matches WHERE game_type = :game_type
-                UNION
-                SELECT DISTINCT team2_name as name, game_type FROM matches WHERE game_type = :game_type
+            $baseQuery = "
+                SELECT team1_name as name, game_type, match_region as region FROM matches WHERE game_type = :game_type1
+                UNION ALL
+                SELECT team2_name as name, game_type, match_region as region FROM matches WHERE game_type = :game_type2
             ";
         }
 
-        $sql = "SELECT DISTINCT name, game_type FROM ($sql) as teams ORDER BY name ASC";
+        // Group by team name and game type, pick the first region alphabetically (or most frequent if needed)
+        $sql = "
+            SELECT name, game_type, MAX(region) as region 
+            FROM ($baseQuery) as all_teams 
+            WHERE name IS NOT NULL AND name != '' AND name != 'TBD' AND name != 'TBA'
+            GROUP BY name, game_type 
+            ORDER BY name ASC
+        ";
 
         $stmt = $this->db->prepare($sql);
         if ($gameType && $gameType !== 'all') {
-            $stmt->execute(['game_type' => $gameType]);
+            $stmt->execute(['game_type1' => $gameType, 'game_type2' => $gameType]);
         } else {
             $stmt->execute();
         }

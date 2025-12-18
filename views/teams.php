@@ -71,8 +71,12 @@
 
     <!-- Actions & Info -->
     <div class="flex flex-col items-end gap-2 flex-shrink-0">
+        <?php
+        $basePath = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']);
+        $syncUrl = $basePath . '/teams/sync' . (($activeTab ?? 'all') !== 'all' ? '?game=' . ($activeTab ?? '') : '');
+        ?>
         <!-- Sync Button -->
-        <a href="teams/sync<?= ($activeTab ?? 'all') !== 'all' ? '?game=' . ($activeTab ?? '') : '' ?>"
+        <a href="<?= $syncUrl ?>"
             class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-sm transition-colors inline-flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

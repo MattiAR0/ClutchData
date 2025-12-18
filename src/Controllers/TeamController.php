@@ -43,12 +43,12 @@ class TeamController
             // If no teams in DB, get unique teams from matches
             if (empty($teams)) {
                 $matchTeams = $this->teamModel->getTeamsFromMatches($gameType !== 'all' ? $gameType : null);
-                // Convert to display format
+                // Convert to display format (now includes region from match data)
                 $teams = array_map(fn($t) => [
                     'id' => null,
                     'name' => $t['name'],
                     'game_type' => $t['game_type'],
-                    'region' => 'Unknown',
+                    'region' => $t['region'] ?? 'Other',
                     'logo_url' => null
                 ], $matchTeams);
             }

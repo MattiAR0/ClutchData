@@ -31,34 +31,50 @@ abstract class LiquipediaScraper implements ScraperInterface
 
     protected function fetch(string $uri): string
     {
-        try {
-            $response = $this->client->request('GET', $uri);
-            return (string) $response->getBody();
-        } catch (\Exception $e) {
-            // En un caso real, loguearíamos el error.
-            return '';
+        $maxRetries = 3;
+        $retryDelay = 5; // Start with 5 seconds
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                // Add a courtesy delay between requests (Liquipedia requires this)
+                if ($attempt > 1) {
+                    sleep($retryDelay);
+                    $retryDelay *= 2; // Exponential backoff
+                }
+
+                $response = $this->client->request('GET', $uri);
+
+                // Success - add small delay before next potential request
+                usleep(2000000); // 2 seconds courtesy delay
+
+                return (string) $response->getBody();
+            } catch (\GuzzleHttp\Exception\ClientException $e) {
+                $statusCode = $e->getResponse()->getStatusCode();
+
+                if ($statusCode === 429 && $attempt < $maxRetries) {
+                    // Rate limited - wait and retry
+                    error_log("Liquipedia rate limited (429), waiting {$retryDelay}s before retry $attempt/$maxRetries");
+                    sleep($retryDelay);
+                    $retryDelay *= 2;
+                    continue;
+                }
+
+                error_log("Liquipedia fetch error for $uri: " . $e->getMessage());
+                return '';
+            } catch (\Exception $e) {
+                error_log("Liquipedia fetch error for $uri: " . $e->getMessage());
+                return '';
+            }
         }
+
+        return '';
     }
 
     protected function detectRegion(string $tournamentName): string
     {
         $tournamentName = strtoupper($tournamentName);
 
-        // Americas / NA / LATAM
-        if (
-            str_contains($tournamentName, 'AMERICAS') ||
-            str_contains($tournamentName, 'NORTH AMERICA') ||
-            str_contains($tournamentName, 'LCS') || // LoL
-            str_contains($tournamentName, 'CBLOL') || // LoL Brazil
-            str_contains($tournamentName, 'LLA') || // LoL LATAM
-            str_contains($tournamentName, 'BRAZIL') ||
-            str_contains($tournamentName, 'LATIN AMERICA') ||
-            str_contains($tournamentName, 'USA')
-        ) {
-            return 'Americas';
-        }
-
-        // Pacific / Asia
+        // Pacific / Asia - CHECK FIRST (many tournaments have Asian references)
         if (
             str_contains($tournamentName, 'PACIFIC') ||
             str_contains($tournamentName, 'LCK') || // Korea
@@ -71,15 +87,43 @@ abstract class LiquipediaScraper implements ScraperInterface
             str_contains($tournamentName, 'JAPAN') ||
             str_contains($tournamentName, 'CHINA') ||
             str_contains($tournamentName, 'ASIA') ||
-            str_contains($tournamentName, 'INDIA')
+            str_contains($tournamentName, 'INDIA') ||
+            // New patterns for Asian tournaments
+            str_contains($tournamentName, 'KR&JP') ||
+            str_contains($tournamentName, 'KR ') ||
+            str_contains($tournamentName, ' KR') ||
+            str_contains($tournamentName, 'JP ') ||
+            str_contains($tournamentName, ' JP') ||
+            str_contains($tournamentName, 'KOREAN') ||
+            str_contains($tournamentName, 'JAPANESE') ||
+            str_contains($tournamentName, 'CHINESE') ||
+            str_contains($tournamentName, 'DEMACIA') || // LoL China event
+            str_contains($tournamentName, 'IONIA') || // LoL China event
+            str_contains($tournamentName, 'SEA ') || // Southeast Asia
+            str_contains($tournamentName, ' SEA') ||
+            str_contains($tournamentName, 'SOUTHEAST') ||
+            str_contains($tournamentName, 'INDONESIA') ||
+            str_contains($tournamentName, ' ID ') || // Indonesia abbrev
+            str_contains($tournamentName, 'VIETNAM') ||
+            str_contains($tournamentName, 'THAILAND') ||
+            str_contains($tournamentName, 'PHILIPPINES') ||
+            str_contains($tournamentName, 'TAIWAN') ||
+            str_contains($tournamentName, 'HONG KONG') ||
+            str_contains($tournamentName, 'SINGAPORE') ||
+            str_contains($tournamentName, 'MALAYSIA') ||
+            str_contains($tournamentName, 'OCEANIA') ||
+            str_contains($tournamentName, 'OCE ') ||
+            str_contains($tournamentName, 'EXTREMESLAND') || // Asian CS2 event
+            str_contains($tournamentName, 'GALAXY BATTLE') // Asian event
         ) {
             return 'Pacific';
         }
 
-        // EMEA / Europe
+        // EMEA / Europe - CHECK SECOND
         if (
             str_contains($tournamentName, 'EMEA') ||
             str_contains($tournamentName, 'EUROPE') ||
+            str_contains($tournamentName, 'EUROPEAN') ||
             str_contains($tournamentName, 'LEC') || // LoL Europe
             str_contains($tournamentName, 'TCL') || // Turkey
             str_contains($tournamentName, 'POKAL') || // DACH
@@ -89,9 +133,62 @@ abstract class LiquipediaScraper implements ScraperInterface
             str_contains($tournamentName, 'PRIME LEAGUE') || // DACH
             str_contains($tournamentName, 'SUPERLIGA') || // Spain
             str_contains($tournamentName, 'ULTRALIGA') || // Poland
-            str_contains($tournamentName, 'CIS')
+            str_contains($tournamentName, 'CIS') ||
+            // New patterns for European tournaments
+            str_contains($tournamentName, 'EU ') ||
+            str_contains($tournamentName, ' EU') ||
+            str_contains($tournamentName, 'ESEA') ||
+            str_contains($tournamentName, 'FACEIT') ||
+            str_contains($tournamentName, 'TURKEY') ||
+            str_contains($tournamentName, 'TURKISH') ||
+            str_contains($tournamentName, 'RUSSIA') ||
+            str_contains($tournamentName, 'RUSSIAN') ||
+            str_contains($tournamentName, ' RU ') ||
+            str_contains($tournamentName, 'SPAIN') ||
+            str_contains($tournamentName, 'SPANISH') ||
+            str_contains($tournamentName, 'FRANCE') ||
+            str_contains($tournamentName, 'FRENCH') ||
+            str_contains($tournamentName, 'GERMANY') ||
+            str_contains($tournamentName, 'GERMAN') ||
+            str_contains($tournamentName, 'POLAND') ||
+            str_contains($tournamentName, 'POLISH') ||
+            str_contains($tournamentName, 'NORDIC') ||
+            str_contains($tournamentName, 'BENELUX') ||
+            str_contains($tournamentName, 'BALKAN') ||
+            str_contains($tournamentName, 'ARABIAN') ||
+            str_contains($tournamentName, 'MENA') ||
+            str_contains($tournamentName, 'MIDDLE EAST') ||
+            str_contains($tournamentName, 'DRACULAN') // EU event
         ) {
             return 'EMEA';
+        }
+
+        // Americas / NA / LATAM
+        if (
+            str_contains($tournamentName, 'AMERICAS') ||
+            str_contains($tournamentName, 'NORTH AMERICA') ||
+            str_contains($tournamentName, 'LCS') || // LoL
+            str_contains($tournamentName, 'CBLOL') || // LoL Brazil
+            str_contains($tournamentName, 'LLA') || // LoL LATAM
+            str_contains($tournamentName, 'BRAZIL') ||
+            str_contains($tournamentName, 'BRAZILIAN') ||
+            str_contains($tournamentName, 'LATIN AMERICA') ||
+            str_contains($tournamentName, 'USA') ||
+            // New patterns
+            str_contains($tournamentName, ' NA ') ||
+            str_contains($tournamentName, 'NA ') ||
+            str_contains($tournamentName, ' NA') ||
+            str_contains($tournamentName, 'LATAM') ||
+            str_contains($tournamentName, 'MEXICO') ||
+            str_contains($tournamentName, 'MEXICAN') ||
+            str_contains($tournamentName, 'ARGENTINA') ||
+            str_contains($tournamentName, 'CHILE') ||
+            str_contains($tournamentName, 'PERU') ||
+            str_contains($tournamentName, 'COLOMBIA') ||
+            str_contains($tournamentName, 'CANADA') ||
+            str_contains($tournamentName, 'CANADIAN')
+        ) {
+            return 'Americas';
         }
 
         // Global / International
@@ -101,7 +198,9 @@ abstract class LiquipediaScraper implements ScraperInterface
             str_contains($tournamentName, 'INVITATIONAL') ||
             str_contains($tournamentName, 'WORLD') ||
             str_contains($tournamentName, 'MSI') ||
-            str_contains($tournamentName, 'MAJOR')
+            str_contains($tournamentName, 'MAJOR') ||
+            str_contains($tournamentName, 'INTERNATIONAL') ||
+            str_contains($tournamentName, 'GLOBAL')
         ) {
             return 'International';
         }
