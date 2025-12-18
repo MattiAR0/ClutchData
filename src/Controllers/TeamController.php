@@ -152,4 +152,112 @@ class TeamController
         header('Location: ' . $redirectUrl);
         exit;
     }
+
+    /**
+     * Sync teams from matches - bulk scrape team data
+     */
+    public function sync(): void
+    {
+        $gameFilter = $_GET['game'] ?? null;
+        $limit = (int) ($_GET['limit'] ?? 20); // Default to 20 teams per sync
+
+        $scraper = new TeamScraper();
+        $synced = 0;
+        $failed = 0;
+        $skipped = 0;
+        $errors = [];
+
+        try {
+            // Get teams from matches that aren't fully scraped yet
+            $matchTeams = $this->teamModel->getTeamsFromMatches($gameFilter);
+
+            foreach ($matchTeams as $teamData) {
+                if ($synced >= $limit) {
+                    break; // Limit reached
+                }
+
+                $teamName = $teamData['name'];
+                $gameType = $teamData['game_type'];
+
+                // Skip TBD and placeholder names
+                if (in_array(strtoupper($teamName), ['TBD', 'TBA', 'UNKNOWN', '???'])) {
+                    continue;
+                }
+
+                // Check if team already fully scraped (has logo and description)
+                $existing = $this->teamModel->getTeamByNameAndGame($teamName, $gameType);
+                if ($existing && !empty($existing['logo_url']) && !empty($existing['description'])) {
+                    $skipped++;
+                    continue;
+                }
+
+                try {
+                    // Scrape team data
+                    $scrapedData = $scraper->scrapeTeam($teamName, $gameType);
+
+                    if ($scrapedData) {
+                        // Save team to database
+                        $teamId = $this->teamModel->saveTeam([
+                            'name' => $scrapedData['name'],
+                            'game_type' => $scrapedData['game_type'],
+                            'region' => $scrapedData['region'],
+                            'country' => $scrapedData['country'],
+                            'logo_url' => $scrapedData['logo_url'],
+                            'description' => $scrapedData['description'],
+                            'liquipedia_url' => $scrapedData['liquipedia_url']
+                        ]);
+
+                        // Save roster players
+                        foreach ($scrapedData['roster'] ?? [] as $playerData) {
+                            $this->playerModel->savePlayer([
+                                'nickname' => $playerData['nickname'],
+                                'game_type' => $gameType,
+                                'team_id' => $teamId,
+                                'role' => $playerData['role'] ?? null,
+                                'country' => $playerData['country'] ?? null,
+                                'liquipedia_url' => $playerData['liquipedia_url'] ?? null
+                            ]);
+                        }
+
+                        $synced++;
+                    } else {
+                        $failed++;
+                        $errors[] = "$teamName ($gameType)";
+                    }
+
+                    // Rate limiting - 2 seconds between requests
+                    sleep(2);
+
+                } catch (Exception $e) {
+                    $failed++;
+                    $errors[] = "$teamName: " . $e->getMessage();
+                }
+            }
+
+            // Set session message
+            $message = "✅ Synced $synced teams";
+            if ($skipped > 0) {
+                $message .= " (skipped $skipped already synced)";
+            }
+            if ($failed > 0) {
+                $message .= " | ❌ Failed: $failed";
+            }
+            $_SESSION['message'] = $message;
+
+            if (!empty($errors) && count($errors) <= 5) {
+                $_SESSION['error'] = "Failed teams: " . implode(', ', $errors);
+            }
+
+        } catch (Exception $e) {
+            $_SESSION['error'] = "Sync error: " . $e->getMessage();
+        }
+
+        // Redirect back to teams page
+        $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/teams';
+        if ($gameFilter) {
+            $redirectUrl .= '?game=' . $gameFilter;
+        }
+        header('Location: ' . $redirectUrl);
+        exit;
+    }
 }

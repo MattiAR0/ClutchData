@@ -1,0 +1,12 @@
+# Enable Rewrite Engine
+RewriteEngine On
+
+# Set base for rewrites
+RewriteBase /ClutchData/
+
+# If a directory or file exists, serve it directly
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Otherwise, route all requests to public/index.php
+RewriteRule ^(.*)$ public/index.php [L,QSA]

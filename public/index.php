@@ -39,6 +39,7 @@ $router->get('/match', [MatchController::class, 'show']); // Match details
 
 // Definir Rutas - Teams
 $router->get('/teams', [TeamController::class, 'index']);
+$router->get('/teams/sync', [TeamController::class, 'sync']);
 $router->get('/team', [TeamController::class, 'show']);
 
 // Definir Rutas - Players

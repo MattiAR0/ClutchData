@@ -69,13 +69,35 @@
         </div>
     </div>
 
-    <!-- Info -->
-    <div class="text-right flex-shrink-0">
+    <!-- Actions & Info -->
+    <div class="flex flex-col items-end gap-2 flex-shrink-0">
+        <!-- Sync Button -->
+        <a href="teams/sync<?= ($activeTab ?? 'all') !== 'all' ? '?game=' . ($activeTab ?? '') : '' ?>"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-sm transition-colors inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            SYNC TEAMS
+        </a>
         <span class="text-xs font-mono text-zinc-500">
             <?= count($teams) ?> TEAMS FOUND
         </span>
     </div>
 </div>
+
+<!-- Status Messages -->
+<?php if (!empty($message)): ?>
+    <div class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-sm">
+        <p class="text-emerald-400 text-sm"><?= htmlspecialchars($message) ?></p>
+    </div>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+    <div class="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 rounded-sm">
+        <p class="text-rose-400 text-sm"><?= htmlspecialchars($error) ?></p>
+    </div>
+<?php endif; ?>
 
 <!-- Teams Grid -->
 <div class="space-y-8">
