@@ -74,16 +74,30 @@
         <?php
         $basePath = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']);
         $syncUrl = $basePath . '/teams/sync' . (($activeTab ?? 'all') !== 'all' ? '?game=' . ($activeTab ?? '') : '');
+        $syncRegionsUrl = $basePath . '/teams/sync-regions' . (($activeTab ?? 'all') !== 'all' ? '?game=' . ($activeTab ?? '') : '');
         ?>
-        <!-- Sync Button -->
-        <a href="<?= $syncUrl ?>"
-            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-sm transition-colors inline-flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            SYNC TEAMS
-        </a>
+        <div class="flex gap-2">
+            <!-- Sync Teams Button -->
+            <a href="<?= $syncUrl ?>"
+                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-sm transition-colors inline-flex items-center gap-2"
+                title="Scrape team details from Liquipedia">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                SYNC TEAMS
+            </a>
+            <!-- Fix Regions Button -->
+            <a href="<?= $syncRegionsUrl ?>"
+                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-sm transition-colors inline-flex items-center gap-2"
+                title="Fix teams with 'Other' region by scraping Liquipedia">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                FIX REGIONS
+            </a>
+        </div>
         <span class="text-xs font-mono text-zinc-500">
             <?= count($teams) ?> TEAMS FOUND
         </span>

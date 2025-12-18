@@ -262,4 +262,174 @@ class TeamController
         header('Location: ' . $redirectUrl);
         exit;
     }
+
+    /**
+     * Sync regions for all teams that have "Other" region
+     * This scrapes Liquipedia to get the correct region for each team
+     */
+    public function syncRegions(): void
+    {
+        // Extend execution time for this long-running process
+        set_time_limit(300); // 5 minutes max
+
+        $gameFilter = $_GET['game'] ?? null;
+        $limit = (int) ($_GET['limit'] ?? 10); // Default to 10 teams per sync (to avoid timeout)
+
+        $scraper = new TeamScraper();
+        $updated = 0;
+        $failed = 0;
+        $skipped = 0;
+        $errors = [];
+
+        try {
+            // Get all unique teams from matches that have "Other" region
+            $teamsToUpdate = $this->getTeamsWithOtherRegion($gameFilter);
+
+            foreach ($teamsToUpdate as $teamData) {
+                if ($updated >= $limit) {
+                    break; // Limit reached
+                }
+
+                $teamName = $teamData['name'];
+                $gameType = $teamData['game_type'];
+
+                // Skip TBD and placeholder names
+                if (in_array(strtoupper($teamName), ['TBD', 'TBA', 'UNKNOWN', '???'])) {
+                    continue;
+                }
+
+                try {
+                    // Scrape team data from Liquipedia
+                    $scrapedData = $scraper->scrapeTeam($teamName, $gameType);
+
+                    if ($scrapedData && $scrapedData['region'] !== 'Other') {
+                        // Update the team in database if it exists
+                        $existing = $this->teamModel->getTeamByNameAndGame($teamName, $gameType);
+
+                        if ($existing) {
+                            // Update existing team's region
+                            $this->teamModel->updateTeam($existing['id'], [
+                                'region' => $scrapedData['region'],
+                                'country' => $scrapedData['country'] ?? $existing['country'],
+                                'logo_url' => $scrapedData['logo_url'] ?? $existing['logo_url'],
+                                'description' => $scrapedData['description'] ?? $existing['description'],
+                                'liquipedia_url' => $scrapedData['liquipedia_url'] ?? $existing['liquipedia_url']
+                            ]);
+                        } else {
+                            // Create new team entry with correct region
+                            $this->teamModel->saveTeam([
+                                'name' => $scrapedData['name'],
+                                'game_type' => $scrapedData['game_type'],
+                                'region' => $scrapedData['region'],
+                                'country' => $scrapedData['country'],
+                                'logo_url' => $scrapedData['logo_url'],
+                                'description' => $scrapedData['description'],
+                                'liquipedia_url' => $scrapedData['liquipedia_url']
+                            ]);
+                        }
+
+                        // Also update the region in the matches table for this team
+                        $this->updateMatchRegionsForTeam($teamName, $gameType, $scrapedData['region']);
+
+                        $updated++;
+                    } else {
+                        // Still "Other" or scraping failed
+                        $skipped++;
+                    }
+
+                    // Rate limiting - 2 seconds between requests
+                    sleep(2);
+
+                } catch (Exception $e) {
+                    $failed++;
+                    $errors[] = "$teamName: " . $e->getMessage();
+                }
+            }
+
+            // Set session message
+            $message = "✅ Updated regions for $updated teams";
+            if ($skipped > 0) {
+                $message .= " (skipped $skipped with no better region found)";
+            }
+            if ($failed > 0) {
+                $message .= " | ❌ Failed: $failed";
+            }
+            $_SESSION['message'] = $message;
+
+            if (!empty($errors) && count($errors) <= 5) {
+                $_SESSION['error'] = "Failed teams: " . implode(', ', $errors);
+            }
+
+        } catch (Exception $e) {
+            $_SESSION['error'] = "Sync regions error: " . $e->getMessage();
+        }
+
+        // Redirect back to teams page
+        $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/teams';
+        if ($gameFilter) {
+            $redirectUrl .= '?game=' . $gameFilter;
+        }
+        header('Location: ' . $redirectUrl);
+        exit;
+    }
+
+    /**
+     * Get unique teams from matches that have "Other" as their region
+     */
+    private function getTeamsWithOtherRegion(?string $gameType = null): array
+    {
+        $db = $this->teamModel->getConnection();
+
+        $baseQuery = "
+            SELECT team1_name as name, game_type, match_region as region FROM matches WHERE match_region = 'Other' OR match_region IS NULL
+            UNION
+            SELECT team2_name as name, game_type, match_region as region FROM matches WHERE match_region = 'Other' OR match_region IS NULL
+        ";
+
+        if ($gameType && $gameType !== 'all') {
+            $baseQuery = "
+                SELECT team1_name as name, game_type, match_region as region FROM matches WHERE (match_region = 'Other' OR match_region IS NULL) AND game_type = :game_type1
+                UNION
+                SELECT team2_name as name, game_type, match_region as region FROM matches WHERE (match_region = 'Other' OR match_region IS NULL) AND game_type = :game_type2
+            ";
+        }
+
+        $sql = "
+            SELECT DISTINCT name, game_type 
+            FROM ($baseQuery) as teams_other 
+            WHERE name IS NOT NULL AND name != '' AND name != 'TBD' AND name != 'TBA'
+            ORDER BY name ASC
+        ";
+
+        $stmt = $db->prepare($sql);
+        if ($gameType && $gameType !== 'all') {
+            $stmt->execute(['game_type1' => $gameType, 'game_type2' => $gameType]);
+        } else {
+            $stmt->execute();
+        }
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Update the match_region for all matches involving this team
+     */
+    private function updateMatchRegionsForTeam(string $teamName, string $gameType, string $region): void
+    {
+        $db = $this->teamModel->getConnection();
+
+        $stmt = $db->prepare("
+            UPDATE matches 
+            SET match_region = :region 
+            WHERE (team1_name = :team1 OR team2_name = :team2) 
+              AND game_type = :game_type 
+              AND (match_region = 'Other' OR match_region IS NULL)
+        ");
+
+        $stmt->execute([
+            'region' => $region,
+            'team1' => $teamName,
+            'team2' => $teamName,
+            'game_type' => $gameType
+        ]);
+    }
 }
