@@ -24,6 +24,30 @@ class PlayerController
     }
 
     /**
+     * List all players with optional game type filter
+     */
+    public function index(?string $gameType = null): void
+    {
+        $error = $_SESSION['error'] ?? null;
+        $message = $_SESSION['message'] ?? null;
+        unset($_SESSION['error'], $_SESSION['message']);
+
+        $activeTab = $gameType ?? $_GET['game'] ?? 'all';
+        $activeRegion = $_GET['region'] ?? 'all';
+
+        try {
+            $players = $this->playerModel->getAllPlayers(
+                $activeTab !== 'all' ? $activeTab : null
+            );
+        } catch (Exception $e) {
+            $error = "Error loading players: " . $e->getMessage();
+            $players = [];
+        }
+
+        require __DIR__ . '/../../views/players.php';
+    }
+
+    /**
      * Show player details with on-demand scraping
      */
     public function show(): void

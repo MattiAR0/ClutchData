@@ -45,6 +45,7 @@ $router->get('/teams/sync-regions', [TeamController::class, 'syncRegions']);
 $router->get('/team', [TeamController::class, 'show']);
 
 // Definir Rutas - Players
+$router->get('/players', [PlayerController::class, 'index']);
 $router->get('/player', [PlayerController::class, 'show']);
 
 // ============================================
