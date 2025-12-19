@@ -32,10 +32,10 @@ class PlayerStatsModel
 
         $sql = "INSERT INTO player_stats 
                 (match_id, player_name, team_name, agent, kills, deaths, assists, 
-                 acs, adr, kast, hs_percent, first_bloods, first_deaths, clutches, data_source) 
+                 acs, adr, kast, hs_percent, rating, first_bloods, first_deaths, clutches, data_source) 
                 VALUES 
                 (:match_id, :player_name, :team_name, :agent, :kills, :deaths, :assists,
-                 :acs, :adr, :kast, :hs_percent, :first_bloods, :first_deaths, :clutches, :data_source)";
+                 :acs, :adr, :kast, :hs_percent, :rating, :first_bloods, :first_deaths, :clutches, :data_source)";
 
         $stmt = $this->db->prepare($sql);
 
@@ -53,6 +53,7 @@ class PlayerStatsModel
                     ':adr' => $player['adr'] ?? null,
                     ':kast' => $player['kast'] ?? null,
                     ':hs_percent' => $player['hs_percent'] ?? null,
+                    ':rating' => $player['rating'] ?? null,
                     ':first_bloods' => $player['first_bloods'] ?? null,
                     ':first_deaths' => $player['first_deaths'] ?? null,
                     ':clutches' => $player['clutches'] ?? null,
@@ -166,6 +167,18 @@ class PlayerStatsModel
     public function hasVlrStats(int $matchId): bool
     {
         $sql = "SELECT COUNT(*) FROM player_stats WHERE match_id = :match_id AND data_source = 'vlr'";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':match_id' => $matchId]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /**
+     * Verifica si un partido tiene stats de HLTV
+     */
+    public function hasHltvStats(int $matchId): bool
+    {
+        $sql = "SELECT COUNT(*) FROM player_stats WHERE match_id = :match_id AND data_source = 'hltv'";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':match_id' => $matchId]);
 

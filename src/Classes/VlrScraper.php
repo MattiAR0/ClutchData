@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Classes;
 
 use App\Interfaces\ScraperInterface;
+use App\Traits\AntiBlockingTrait;
 use GuzzleHttp\Client;
 use Symfony\Component\DomCrawler\Crawler;
 use Exception;
@@ -14,29 +15,23 @@ use Exception;
  */
 class VlrScraper implements ScraperInterface
 {
+    use AntiBlockingTrait;
+
     protected Client $client;
     protected string $baseUrl = 'https://www.vlr.gg';
 
-    // Rate limiting
-    protected int $requestDelayMs = 2000;
-    protected ?float $lastRequestTime = null;
-
     public function __construct()
     {
+        // Configuración específica para VLR.gg
+        $this->baseDelayMs = 2500;
+        $this->jitterFactor = 0.3;
+        $this->maxRetries = 4;
+
         $this->client = new Client([
             'base_uri' => $this->baseUrl,
             'timeout' => 15.0,
-            'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.5',
-                'Accept-Encoding' => 'gzip, deflate, br',
-                'Referer' => 'https://www.google.com/',
-                'DNT' => '1',
-                'Connection' => 'keep-alive',
-                'Upgrade-Insecure-Requests' => '1',
-            ],
-            'verify' => false
+            'verify' => false,
+            'cookies' => true
         ]);
     }
 
@@ -46,36 +41,57 @@ class VlrScraper implements ScraperInterface
     }
 
     /**
-     * Aplica rate limiting entre requests
-     */
-    protected function applyRateLimit(): void
-    {
-        if ($this->lastRequestTime !== null) {
-            $elapsed = (microtime(true) - $this->lastRequestTime) * 1000;
-            if ($elapsed < $this->requestDelayMs) {
-                $sleepTime = (int) max(0, ($this->requestDelayMs - $elapsed) * 1000);
-                if ($sleepTime > 0) {
-                    usleep($sleepTime);
-                }
-            }
-        }
-        $this->lastRequestTime = microtime(true);
-    }
-
-    /**
-     * Fetch HTML con rate limiting
+     * Fetch HTML con rate limiting inteligente y reintentos
+     * 
+     * @param string $uri URI relativa a VLR.gg
+     * @return string HTML content o cadena vacía si falla
      */
     protected function fetch(string $uri): string
     {
-        $this->applyRateLimit();
+        $attempt = 0;
 
-        try {
-            $response = $this->client->request('GET', $uri);
-            return (string) $response->getBody();
-        } catch (Exception $e) {
-            error_log("VlrScraper fetch error: " . $e->getMessage());
-            return '';
+        while ($attempt <= $this->maxRetries) {
+            $this->applySmartRateLimit();
+
+            try {
+                $response = $this->client->request('GET', $uri, [
+                    'headers' => $this->getRandomHeaders()
+                ]);
+
+                $statusCode = $response->getStatusCode();
+
+                if ($statusCode === 200) {
+                    $this->registerSuccess();
+                    return (string) $response->getBody();
+                }
+
+                error_log("VlrScraper: Unexpected status code {$statusCode} for {$uri}");
+                $this->registerFailure();
+
+            } catch (\GuzzleHttp\Exception\ClientException $e) {
+                $statusCode = $e->getResponse()->getStatusCode();
+                $this->registerFailure();
+
+                if ($statusCode === 429 || $statusCode === 403) {
+                    error_log("VlrScraper: Rate limited ({$statusCode}) for {$uri}, attempt {$attempt}, backing off...");
+                } else {
+                    error_log("VlrScraper: Client error ({$statusCode}) for {$uri}: " . $e->getMessage());
+                }
+
+            } catch (Exception $e) {
+                $this->registerFailure();
+                error_log("VlrScraper fetch error for {$uri}: " . $e->getMessage());
+            }
+
+            $attempt++;
+
+            if (!$this->shouldRetry()) {
+                error_log("VlrScraper: Max retries reached for {$uri}");
+                break;
+            }
         }
+
+        return '';
     }
 
     /**

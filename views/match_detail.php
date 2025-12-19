@@ -83,7 +83,8 @@
                                 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
                                 <?= $match['team1_score'] ?>
                             </span>
-                            <span class="text-4xl font-thin text-zinc-700 mb-2">:</span>
+                            <span
+                                class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-zinc-500">:</span>
                             <span
                                 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">
                                 <?= $match['team2_score'] ?>
@@ -241,7 +242,7 @@
                 </div>
             <?php endif; ?>
 
-            <!-- Unified Player Statistics (VLR + Liquipedia) -->
+            <!-- Unified Player Statistics (VLR + HLTV + Liquipedia) -->
             <?php
             $hasStats = !empty($match['merged_stats']) &&
                 (count($match['merged_stats'][$match['team1_name']] ?? []) > 0 ||
@@ -250,14 +251,20 @@
             if ($hasStats):
                 // Determine data source for header display
                 $hasVlrData = false;
+                $hasHltvData = false;
                 $hasLiquipediaData = false;
                 foreach ($match['merged_stats'] as $teamPlayers) {
                     foreach ($teamPlayers as $p) {
-                        if ($p['data_source'] === 'vlr') $hasVlrData = true;
-                        if ($p['data_source'] === 'liquipedia') $hasLiquipediaData = true;
+                        if ($p['data_source'] === 'vlr')
+                            $hasVlrData = true;
+                        if ($p['data_source'] === 'hltv')
+                            $hasHltvData = true;
+                        if ($p['data_source'] === 'liquipedia')
+                            $hasLiquipediaData = true;
                     }
                 }
-            ?>
+                $hasAdvancedStats = $hasVlrData || $hasHltvData;
+                ?>
                 <div class="mb-16">
                     <div class="flex items-center gap-4 mb-8">
                         <div class="h-px bg-zinc-800 flex-grow"></div>
@@ -271,7 +278,30 @@
                         <div class="h-px bg-zinc-800 flex-grow"></div>
                     </div>
 
-
+                    <!-- Data Source Badge -->
+                    <div class="flex justify-center gap-2 mb-6">
+                        <?php if ($hasVlrData): ?>
+                            <span
+                                class="inline-flex items-center px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-[10px] text-rose-400 font-bold uppercase tracking-widest">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2 animate-pulse"></span>
+                                VLR.gg Stats
+                            </span>
+                        <?php endif; ?>
+                        <?php if ($hasHltvData): ?>
+                            <span
+                                class="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-[10px] text-orange-400 font-bold uppercase tracking-widest">
+                                <span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 animate-pulse"></span>
+                                HLTV Stats
+                            </span>
+                        <?php endif; ?>
+                        <?php if ($hasLiquipediaData && !$hasAdvancedStats): ?>
+                            <span
+                                class="inline-flex items-center px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span>
+                                Liquipedia Stats
+                            </span>
+                        <?php endif; ?>
+                    </div>
 
                     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                         <?php
@@ -281,11 +311,14 @@
                         ];
 
                         foreach ($teams as $team):
-                            if (empty($team['players'])) continue;
-                        ?>
-                            <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+                            if (empty($team['players']))
+                                continue;
+                            ?>
+                            <div
+                                class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
                                 <!-- Team Header -->
-                                <div class="px-6 py-4 bg-gradient-to-r from-<?= $team['color'] ?>-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
+                                <div
+                                    class="px-6 py-4 bg-gradient-to-r from-<?= $team['color'] ?>-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
                                     <h4 class="text-lg font-black text-white italic tracking-wide">
                                         <?= htmlspecialchars($team['name']) ?>
                                     </h4>
@@ -299,18 +332,33 @@
                                     <table class="w-full text-left">
                                         <thead>
                                             <tr class="border-b border-zinc-800 bg-zinc-900/80">
-                                                <th class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Player</th>
-                                                <?php if ($hasVlrData): ?>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center" title="Average Combat Score">ACS</th>
+                                                <th
+                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                    Player</th>
+                                                <?php if ($hasHltvData): ?>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                        title="HLTV Rating 2.0">Rating</th>
+                                                <?php elseif ($hasVlrData): ?>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                        title="Average Combat Score">ACS</th>
                                                 <?php endif; ?>
-                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">K</th>
-                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">D</th>
-                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">A</th>
-                                                <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">K/D</th>
-                                                <?php if ($hasVlrData): ?>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center" title="Average Damage per Round">ADR</th>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center" title="Kill/Assist/Survive/Trade %">KAST</th>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center" title="Headshot %">HS%</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    K</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    D</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    A</th>
+                                                <th
+                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                    K/D</th>
+                                                <?php if ($hasAdvancedStats): ?>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                        title="Average Damage per Round">ADR</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                        title="Kill/Assist/Survive/Trade %">KAST</th>
                                                 <?php endif; ?>
                                             </tr>
                                         </thead>
@@ -319,10 +367,17 @@
                                                 <?php
                                                 $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
                                                 $kdColor = $kd >= 1.0 ? 'text-emerald-400' : 'text-rose-400';
-                                                if ($player['kills'] == 0 && $player['deaths'] == 0) $kdColor = 'text-zinc-500';
+                                                if ($player['kills'] == 0 && $player['deaths'] == 0)
+                                                    $kdColor = 'text-zinc-500';
 
+                                                // Rating color (for HLTV)
+                                                $rating = $player['rating'] ?? null;
+                                                $ratingColor = $rating !== null ? ($rating >= 1.10 ? 'text-emerald-400' : ($rating >= 1.0 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                                                // ACS color (for VLR)
                                                 $acs = $player['acs'] ?? null;
                                                 $acsColor = $acs !== null ? ($acs >= 250 ? 'text-emerald-400' : ($acs >= 200 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
                                                 $kast = $player['kast'] ?? null;
                                                 $kastColor = $kast !== null ? ($kast >= 75 ? 'text-emerald-400' : ($kast >= 60 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
 
@@ -331,12 +386,19 @@
                                                     <td class="px-4 py-3">
                                                         <div class="flex items-center gap-2">
                                                             <?php if (!empty($player['agent'])): ?>
-                                                                <span class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded"><?= htmlspecialchars($player['agent']) ?></span>
+                                                                <span
+                                                                    class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded"><?= htmlspecialchars($player['agent']) ?></span>
                                                             <?php endif; ?>
-                                                            <span class="font-bold text-zinc-200 text-sm"><?= htmlspecialchars($player['name']) ?></span>
+                                                            <span
+                                                                class="font-bold text-zinc-200 text-sm"><?= htmlspecialchars($player['name']) ?></span>
                                                         </div>
                                                     </td>
-                                                    <?php if ($hasVlrData): ?>
+                                                    <?php if ($hasHltvData): ?>
+                                                        <td
+                                                            class="px-3 py-3 text-center font-mono text-sm font-bold <?= $ratingColor ?>">
+                                                            <?= $rating !== null ? number_format($rating, 2) : '-' ?>
+                                                        </td>
+                                                    <?php elseif ($hasVlrData): ?>
                                                         <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $acsColor ?>">
                                                             <?= $acs !== null ? $acs : '-' ?>
                                                         </td>
@@ -353,15 +415,12 @@
                                                     <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $kdColor ?>">
                                                         <?= number_format($kd, 2) ?>
                                                     </td>
-                                                    <?php if ($hasVlrData): ?>
+                                                    <?php if ($hasAdvancedStats): ?>
                                                         <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">
                                                             <?= $player['adr'] !== null ? number_format($player['adr'], 1) : '-' ?>
                                                         </td>
                                                         <td class="px-3 py-3 text-center font-mono text-sm <?= $kastColor ?>">
                                                             <?= $kast !== null ? number_format($kast, 1) . '%' : '-' ?>
-                                                        </td>
-                                                        <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">
-                                                            <?= $player['hs_percent'] !== null ? number_format($player['hs_percent'], 1) . '%' : '-' ?>
                                                         </td>
                                                     <?php endif; ?>
                                                 </tr>

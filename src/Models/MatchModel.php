@@ -22,12 +22,12 @@ class MatchModel
             INSERT INTO matches (
                 game_type, team1_name, team2_name, tournament_name, match_time, 
                 match_region, team1_score, team2_score, match_status, match_url, 
-                ai_prediction, match_importance, vlr_match_id
+                ai_prediction, match_importance, vlr_match_id, hltv_match_id
             ) 
             VALUES (
                 :game_type, :team1, :team2, :tournament, :time, 
                 :region, :team1_score, :team2_score, :status, :url, 
-                :prediction, :importance, :vlr_match_id
+                :prediction, :importance, :vlr_match_id, :hltv_match_id
             )
         ");
 
@@ -47,7 +47,8 @@ class MatchModel
                 ':url' => $match['match_url'] ?? null,
                 ':prediction' => $prediction,
                 ':importance' => $match['match_importance'] ?? 0,
-                ':vlr_match_id' => $match['vlr_match_id'] ?? null
+                ':vlr_match_id' => $match['vlr_match_id'] ?? null,
+                ':hltv_match_id' => $match['hltv_match_id'] ?? null
             ]);
         }
     }
@@ -166,11 +167,30 @@ class MatchModel
     }
 
     /**
+     * Actualiza el hltv_match_id de un partido
+     */
+    public function updateHltvMatchId(int $id, string $hltvMatchId): void
+    {
+        $stmt = $this->db->prepare("UPDATE matches SET hltv_match_id = :hltv_id WHERE id = :id");
+        $stmt->execute([':hltv_id' => $hltvMatchId, ':id' => $id]);
+    }
+
+    /**
      * Obtiene partidos de Valorant sin vlr_match_id (para enriquecer)
      */
     public function getValorantMatchesWithoutVlr(): array
     {
         $sql = "SELECT * FROM matches WHERE game_type = 'valorant' AND vlr_match_id IS NULL AND match_status = 'completed'";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtiene partidos de CS2 sin hltv_match_id (para enriquecer)
+     */
+    public function getCs2MatchesWithoutHltv(): array
+    {
+        $sql = "SELECT * FROM matches WHERE game_type = 'cs2' AND hltv_match_id IS NULL AND match_status = 'completed'";
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

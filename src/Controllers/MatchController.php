@@ -8,6 +8,7 @@ use App\Classes\ValorantScraper;
 use App\Classes\LolScraper;
 use App\Classes\Cs2Scraper;
 use App\Classes\VlrScraper;
+use App\Classes\HltvScraper;
 use App\Models\MatchModel;
 use App\Models\PlayerStatsModel;
 use Exception;
@@ -194,19 +195,61 @@ class MatchController
             }
         }
 
+        // Enriquecer con HLTV stats para CS2
+        $hltvStats = [];
+        if ($match['game_type'] === 'cs2' && $match['match_status'] === 'completed') {
+            try {
+                $playerStatsModel = new PlayerStatsModel($this->model->getConnection());
+
+                // Verificar si ya tenemos stats de HLTV
+                if (!$playerStatsModel->hasHltvStats($match['id'])) {
+                    // Intentar obtener stats de HLTV
+                    $hltvScraper = new HltvScraper();
+
+                    // Si ya tenemos hltv_match_id, usarlo directamente
+                    if (!empty($match['hltv_match_id'])) {
+                        $hltvDetails = $hltvScraper->scrapeMatchDetails($match['hltv_match_id']);
+                        if (!empty($hltvDetails['players'])) {
+                            $playerStatsModel->saveStats($match['id'], $hltvDetails['players']);
+                        }
+                    } else {
+                        // Buscar por nombres de equipo
+                        $hltvMatchId = $hltvScraper->findMatchByTeams(
+                            $match['team1_name'],
+                            $match['team2_name'],
+                            $match['match_time']
+                        );
+
+                        if ($hltvMatchId) {
+                            $this->model->updateHltvMatchId($match['id'], $hltvMatchId);
+                            $hltvDetails = $hltvScraper->scrapeMatchDetails($hltvMatchId);
+                            if (!empty($hltvDetails['players'])) {
+                                $playerStatsModel->saveStats($match['id'], $hltvDetails['players']);
+                            }
+                        }
+                    }
+                }
+
+                // Obtener stats guardadas
+                $hltvStats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+            } catch (Exception $e) {
+                error_log("Failed to enrich with HLTV stats: " . $e->getMessage());
+            }
+        }
+
         // Decode details for view
         $match['details_decoded'] = !empty($match['match_details']) ? json_decode($match['match_details'], true) : [];
         $match['vlr_stats'] = $vlrStats;
+        $match['hltv_stats'] = $hltvStats;
 
-        // Merge stats from both sources (VLR prioritized, Liquipedia as fallback)
+        // Merge stats from both sources (VLR/HLTV prioritized, Liquipedia as fallback)
         $match['merged_stats'] = $this->mergePlayerStats($match);
 
         require __DIR__ . '/../../views/match_detail.php';
     }
-
     /**
-     * Merge player stats from VLR.gg and Liquipedia into unified format
-     * VLR stats are prioritized (more complete: ACS, ADR, KAST, HS%)
+     * Merge player stats from VLR.gg/HLTV and Liquipedia into unified format
+     * VLR/HLTV stats are prioritized (more complete: ACS, ADR, KAST, HS%, Rating)
      * Liquipedia stats used as fallback
      */
     private function mergePlayerStats(array $match): array
@@ -219,12 +262,23 @@ class MatchController
         $mergedByTeam[$team1Name] = [];
         $mergedByTeam[$team2Name] = [];
 
-        // First, add VLR stats (prioritized source - more complete data)
-        $vlrStats = $match['vlr_stats'] ?? [];
-        $vlrTeam1 = $vlrStats['team1'] ?? [];
-        $vlrTeam2 = $vlrStats['team2'] ?? [];
+        // Determine which stats source to use based on game type
+        $stats = [];
+        $dataSource = 'liquipedia';
 
-        foreach ($vlrTeam1 as $player) {
+        if ($match['game_type'] === 'valorant') {
+            $stats = $match['vlr_stats'] ?? [];
+            $dataSource = 'vlr';
+        } elseif ($match['game_type'] === 'cs2') {
+            $stats = $match['hltv_stats'] ?? [];
+            $dataSource = 'hltv';
+        }
+
+        $statsTeam1 = $stats['team1'] ?? [];
+        $statsTeam2 = $stats['team2'] ?? [];
+
+        // Process team1 stats
+        foreach ($statsTeam1 as $player) {
             $mergedByTeam[$team1Name][] = [
                 'name' => $player['player_name'] ?? $player['name'] ?? 'Unknown',
                 'agent' => $player['agent'] ?? null,
@@ -235,12 +289,14 @@ class MatchController
                 'adr' => $player['adr'] ?? null,
                 'kast' => $player['kast'] ?? null,
                 'hs_percent' => $player['hs_percent'] ?? null,
+                'rating' => $player['rating'] ?? null,
                 'first_bloods' => $player['first_bloods'] ?? null,
-                'data_source' => 'vlr'
+                'data_source' => $dataSource
             ];
         }
 
-        foreach ($vlrTeam2 as $player) {
+        // Process team2 stats
+        foreach ($statsTeam2 as $player) {
             $mergedByTeam[$team2Name][] = [
                 'name' => $player['player_name'] ?? $player['name'] ?? 'Unknown',
                 'agent' => $player['agent'] ?? null,
@@ -251,12 +307,13 @@ class MatchController
                 'adr' => $player['adr'] ?? null,
                 'kast' => $player['kast'] ?? null,
                 'hs_percent' => $player['hs_percent'] ?? null,
+                'rating' => $player['rating'] ?? null,
                 'first_bloods' => $player['first_bloods'] ?? null,
-                'data_source' => 'vlr'
+                'data_source' => $dataSource
             ];
         }
 
-        // If no VLR stats, use Liquipedia stats as fallback
+        // If no VLR/HLTV stats, use Liquipedia stats as fallback
         if (empty($mergedByTeam[$team1Name]) && empty($mergedByTeam[$team2Name])) {
             $liquipediaPlayers = $match['details_decoded']['players'] ?? [];
 
@@ -282,6 +339,7 @@ class MatchController
                     'adr' => null,
                     'kast' => null,
                     'hs_percent' => null,
+                    'rating' => null,
                     'first_bloods' => null,
                     'data_source' => 'liquipedia'
                 ];
@@ -291,3 +349,4 @@ class MatchController
         return $mergedByTeam;
     }
 }
+

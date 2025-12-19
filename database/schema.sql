@@ -14,11 +14,12 @@ CREATE TABLE IF NOT EXISTS matches (
     ai_prediction FLOAT DEFAULT NULL,
     match_importance INT DEFAULT 0,
     vlr_match_id VARCHAR(50) DEFAULT NULL,
+    hltv_match_id VARCHAR(50) DEFAULT NULL,
     match_details JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tabla para estadísticas avanzadas de jugadores (VLR.gg)
+-- Tabla para estadísticas avanzadas de jugadores (VLR.gg / HLTV)
 CREATE TABLE IF NOT EXISTS player_stats (
     id INT AUTO_INCREMENT PRIMARY KEY,
     match_id INT NOT NULL,
@@ -32,10 +33,11 @@ CREATE TABLE IF NOT EXISTS player_stats (
     adr DECIMAL(5,1) DEFAULT NULL,
     kast DECIMAL(4,1) DEFAULT NULL,
     hs_percent DECIMAL(4,1) DEFAULT NULL,
+    rating DECIMAL(3,2) DEFAULT NULL,
     first_bloods INT DEFAULT NULL,
     first_deaths INT DEFAULT NULL,
     clutches VARCHAR(20) DEFAULT NULL,
-    data_source ENUM('liquipedia', 'vlr') DEFAULT 'liquipedia',
+    data_source ENUM('liquipedia', 'vlr', 'hltv') DEFAULT 'liquipedia',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
     INDEX idx_match_id (match_id),

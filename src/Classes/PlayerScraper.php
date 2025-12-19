@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Classes;
 
+use App\Traits\AntiBlockingTrait;
 use GuzzleHttp\Client;
 use Symfony\Component\DomCrawler\Crawler;
 use Exception;
@@ -14,6 +15,8 @@ use Exception;
  */
 class PlayerScraper
 {
+    use AntiBlockingTrait;
+
     protected Client $client;
     protected string $baseUrl = 'https://liquipedia.net';
 
@@ -26,6 +29,11 @@ class PlayerScraper
 
     public function __construct()
     {
+        // Configuración para Liquipedia players
+        $this->baseDelayMs = 1500;
+        $this->jitterFactor = 0.25;
+        $this->maxRetries = 3;
+
         $this->client = new Client([
             'base_uri' => $this->baseUrl,
             'timeout' => 15.0,
@@ -38,14 +46,24 @@ class PlayerScraper
     }
 
     /**
-     * Fetch HTML content from Liquipedia
+     * Fetch HTML content from Liquipedia with anti-blocking
      */
     protected function fetch(string $uri): string
     {
+        $this->applySmartRateLimit();
+
         try {
-            $response = $this->client->request('GET', $uri);
+            $headers = $this->getRandomHeaders();
+            $headers['User-Agent'] = 'MultiGameStats-StudentProject/1.0 (contact@example.com)';
+
+            $response = $this->client->request('GET', $uri, [
+                'headers' => $headers
+            ]);
+
+            $this->registerSuccess();
             return (string) $response->getBody();
         } catch (Exception $e) {
+            $this->registerFailure();
             error_log("PlayerScraper fetch error: " . $e->getMessage());
             return '';
         }

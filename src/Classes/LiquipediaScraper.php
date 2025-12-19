@@ -6,11 +6,14 @@ namespace App\Classes;
 
 use App\Interfaces\ScraperInterface;
 use App\Exceptions\ScrapingException;
+use App\Traits\AntiBlockingTrait;
 use GuzzleHttp\Client;
 use Symfony\Component\DomCrawler\Crawler;
 
 abstract class LiquipediaScraper implements ScraperInterface
 {
+    use AntiBlockingTrait;
+
     protected Client $client;
     protected ?LiquipediaAPI $api = null;
     protected bool $useApiFallback = true;
@@ -18,6 +21,11 @@ abstract class LiquipediaScraper implements ScraperInterface
 
     public function __construct()
     {
+        // Configuración para Liquipedia (menos restrictivo, tiene API fallback)
+        $this->baseDelayMs = 1500;
+        $this->jitterFactor = 0.25;
+        $this->maxRetries = 3;
+
         $this->client = new Client([
             'base_uri' => $this->baseUrl,
             'timeout' => 10.0,
@@ -45,41 +53,54 @@ abstract class LiquipediaScraper implements ScraperInterface
 
     protected function fetch(string $uri): string
     {
-        $maxRetries = 2; // Reduced from 3 for faster fallback
-        $retryDelay = 2; // Reduced from 5 seconds
-        $lastError = null;
+        $attempt = 0;
 
-        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+        while ($attempt <= $this->maxRetries) {
+            $this->applySmartRateLimit();
+
             try {
-                // Add a courtesy delay between retries (not on first attempt)
-                if ($attempt > 1) {
-                    sleep($retryDelay);
+                // Liquipedia prefiere header de proyecto específico
+                $headers = $this->getRandomHeaders();
+                $headers['User-Agent'] = 'MultiGameStats-StudentProject/1.0 (contact@example.com)';
+
+                $response = $this->client->request('GET', $uri, [
+                    'headers' => $headers
+                ]);
+
+                $statusCode = $response->getStatusCode();
+
+                if ($statusCode === 200) {
+                    $this->registerSuccess();
+                    return (string) $response->getBody();
                 }
 
-                $response = $this->client->request('GET', $uri);
-
-                // Success - small delay before next potential request
-                usleep(1000000); // 1 second courtesy delay
-
-                return (string) $response->getBody();
             } catch (\GuzzleHttp\Exception\ClientException $e) {
                 $statusCode = $e->getResponse()->getStatusCode();
-                $lastError = $e;
+                $this->registerFailure();
 
                 if ($statusCode === 429) {
-                    // Rate limited - go directly to API fallback
                     error_log("Liquipedia rate limited (429), trying API fallback");
-                    break; // Exit loop immediately to try API
+                    // Saltar directamente al fallback de API
+                    if ($this->useApiFallback) {
+                        return $this->fetchViaApi($uri);
+                    }
                 }
 
                 error_log("Liquipedia fetch error for $uri: " . $e->getMessage());
+
             } catch (\Exception $e) {
-                $lastError = $e;
+                $this->registerFailure();
                 error_log("Liquipedia fetch error for $uri: " . $e->getMessage());
+            }
+
+            $attempt++;
+
+            if (!$this->shouldRetry()) {
+                break;
             }
         }
 
-        // Try API fallback if enabled
+        // Último intento: API fallback
         if ($this->useApiFallback) {
             return $this->fetchViaApi($uri);
         }
