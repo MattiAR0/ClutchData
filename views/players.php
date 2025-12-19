@@ -47,11 +47,33 @@
         </div>
     </div>
 
-    <!-- Info -->
-    <div class="flex flex-col items-end gap-2 flex-shrink-0">
+    <!-- Info & Actions -->
+    <div class="flex flex-col items-end gap-3 flex-shrink-0">
         <span class="text-xs font-mono text-zinc-500">
             <?= count($players) ?> PLAYERS FOUND
         </span>
+
+        <!-- Sync Actions -->
+        <div class="flex gap-2 flex-wrap justify-end">
+            <a href="players/sync<?= isset($activeTab) && $activeTab !== 'all' ? '?game=' . $activeTab : '' ?>"
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600/20 border border-emerald-600/40 text-emerald-400 text-xs font-bold rounded-sm hover:bg-emerald-600/30 hover:border-emerald-500 transition-all duration-200"
+                title="Sync players from match statistics">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                SYNC FROM STATS
+            </a>
+            <a href="players/sync-from-teams<?= isset($activeTab) && $activeTab !== 'all' ? '?game=' . $activeTab : '' ?>"
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600/20 border border-indigo-600/40 text-indigo-400 text-xs font-bold rounded-sm hover:bg-indigo-600/30 hover:border-indigo-500 transition-all duration-200"
+                title="Sync player rosters from teams">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                SYNC FROM TEAMS
+            </a>
+        </div>
     </div>
 </div>
 

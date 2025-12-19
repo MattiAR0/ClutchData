@@ -46,6 +46,8 @@ $router->get('/team', [TeamController::class, 'show']);
 
 // Definir Rutas - Players
 $router->get('/players', [PlayerController::class, 'index']);
+$router->get('/players/sync', [PlayerController::class, 'sync']);
+$router->get('/players/sync-from-teams', [PlayerController::class, 'syncFromTeams']);
 $router->get('/player', [PlayerController::class, 'show']);
 
 // ============================================

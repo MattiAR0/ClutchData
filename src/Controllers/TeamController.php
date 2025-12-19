@@ -161,8 +161,11 @@ class TeamController
      */
     public function sync(): void
     {
+        // Extend execution time for long-running sync operations
+        set_time_limit(0);
+
         $gameFilter = $_GET['game'] ?? null;
-        $limit = (int) ($_GET['limit'] ?? 20); // Default to 20 teams per sync
+        $limit = (int) ($_GET['limit'] ?? 10); // Default to 10 teams per sync to avoid timeout
 
         $scraper = new TeamScraper();
         $synced = 0;

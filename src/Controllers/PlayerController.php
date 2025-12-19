@@ -137,4 +137,156 @@ class PlayerController
         header('Location: ' . $redirectUrl);
         exit;
     }
+
+    /**
+     * Redirect to players index
+     */
+    private function redirectToIndex(?string $gameFilter = null): void
+    {
+        $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/players';
+        if ($gameFilter) {
+            $redirectUrl .= '?game=' . $gameFilter;
+        }
+        header('Location: ' . $redirectUrl);
+        exit;
+    }
+
+    /**
+     * Sync players from match statistics (player_stats table)
+     */
+    public function sync(): void
+    {
+        $gameFilter = $_GET['game'] ?? null;
+        $db = $this->playerModel->getConnection();
+
+        $synced = 0;
+        $skipped = 0;
+
+        try {
+            // Get unique players from player_stats
+            $sql = "
+                SELECT DISTINCT 
+                    ps.player_name as nickname,
+                    m.game_type,
+                    ps.team_name
+                FROM player_stats ps
+                JOIN matches m ON ps.match_id = m.id
+                WHERE ps.player_name IS NOT NULL 
+                  AND ps.player_name != ''
+                  AND ps.player_name != 'TBD'
+            ";
+
+            $params = [];
+            if ($gameFilter && $gameFilter !== 'all') {
+                $sql .= " AND m.game_type = :game_type";
+                $params['game_type'] = $gameFilter;
+            }
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $statsPlayers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            foreach ($statsPlayers as $player) {
+                // Check if player already exists
+                $existing = $this->playerModel->getPlayerByNickname($player['nickname'], $player['game_type']);
+
+                if (!$existing) {
+                    // Find team ID if available
+                    $teamId = null;
+                    if (!empty($player['team_name'])) {
+                        $team = $this->teamModel->getTeamByNameAndGame($player['team_name'], $player['game_type']);
+                        $teamId = $team['id'] ?? null;
+                    }
+
+                    $this->playerModel->savePlayer([
+                        'nickname' => $player['nickname'],
+                        'game_type' => $player['game_type'],
+                        'team_id' => $teamId
+                    ]);
+                    $synced++;
+                } else {
+                    $skipped++;
+                }
+            }
+
+            $_SESSION['message'] = "✅ Synced $synced players from match stats (skipped $skipped existing)";
+        } catch (\Exception $e) {
+            $_SESSION['error'] = "Sync error: " . $e->getMessage();
+        }
+
+        $this->redirectToIndex($gameFilter !== 'all' ? $gameFilter : null);
+    }
+
+    /**
+     * Sync players from all teams (scrape rosters)
+     */
+    public function syncFromTeams(): void
+    {
+        $gameFilter = $_GET['game'] ?? null;
+        $limit = (int) ($_GET['limit'] ?? 10);
+
+        $synced = 0;
+        $teamsProcessed = 0;
+        $errors = [];
+
+        try {
+            $teamScraper = new \App\Classes\TeamScraper();
+
+            // Get teams that need roster sync
+            $teams = $this->teamModel->getAllTeams(
+                $gameFilter !== 'all' ? $gameFilter : null
+            );
+
+            foreach ($teams as $team) {
+                if ($teamsProcessed >= $limit)
+                    break;
+
+                // Skip if team already has players in DB
+                $existingPlayers = $this->playerModel->getPlayersByTeam($team['id']);
+                if (!empty($existingPlayers)) {
+                    continue;
+                }
+
+                $teamsProcessed++;
+
+                try {
+                    // Scrape team to get roster
+                    $scrapedData = $teamScraper->scrapeTeam($team['name'], $team['game_type']);
+
+                    if ($scrapedData && !empty($scrapedData['roster'])) {
+                        foreach ($scrapedData['roster'] as $playerData) {
+                            $this->playerModel->savePlayer([
+                                'nickname' => $playerData['nickname'],
+                                'game_type' => $team['game_type'],
+                                'team_id' => $team['id'],
+                                'role' => $playerData['role'] ?? null,
+                                'country' => $playerData['country'] ?? null,
+                                'liquipedia_url' => $playerData['liquipedia_url'] ?? null
+                            ]);
+                            $synced++;
+                        }
+                    }
+
+                    // Rate limiting
+                    sleep(2);
+                } catch (\Exception $e) {
+                    $errors[] = $team['name'] . ": " . substr($e->getMessage(), 0, 30);
+                }
+            }
+
+            $message = "✅ Synced $synced players from $teamsProcessed teams";
+            if (!empty($errors)) {
+                $message .= " | Errors: " . count($errors);
+            }
+            $_SESSION['message'] = $message;
+
+            if (!empty($errors) && count($errors) <= 3) {
+                $_SESSION['error'] = implode(', ', $errors);
+            }
+        } catch (\Exception $e) {
+            $_SESSION['error'] = "Sync error: " . $e->getMessage();
+        }
+
+        $this->redirectToIndex($gameFilter !== 'all' ? $gameFilter : null);
+    }
 }
