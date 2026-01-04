@@ -219,32 +219,39 @@ class PlayerController
 
     /**
      * Sync players from all teams (scrape rosters)
+     * Processes in batches of 5 teams to avoid timeout
      */
     public function syncFromTeams(): void
     {
         $gameFilter = $_GET['game'] ?? null;
-        $limit = (int) ($_GET['limit'] ?? 10);
+        $batchSize = 5; // Process 5 teams per request to avoid timeout
+        $offset = (int) ($_GET['offset'] ?? 0);
+        $force = isset($_GET['force']);
 
         $synced = 0;
         $teamsProcessed = 0;
+        $teamsSkipped = 0;
         $errors = [];
 
         try {
             $teamScraper = new \App\Classes\TeamScraper();
 
-            // Get teams that need roster sync
-            $teams = $this->teamModel->getAllTeams(
+            // Get all teams
+            $allTeams = $this->teamModel->getAllTeams(
                 $gameFilter !== 'all' ? $gameFilter : null
             );
 
-            foreach ($teams as $team) {
-                if ($teamsProcessed >= $limit)
-                    break;
+            $totalTeams = count($allTeams);
 
-                // Skip if team already has players in DB
+            // Get batch of teams starting from offset
+            $teams = array_slice($allTeams, $offset, $batchSize);
+
+            foreach ($teams as $team) {
+                // Skip if team already has a complete roster (5+ players)
                 $existingPlayers = $this->playerModel->getPlayersByTeam($team['id']);
-                if (!empty($existingPlayers)) {
-                    continue;
+                if (!$force && count($existingPlayers) >= 5) {
+                    $teamsSkipped++;
+                    continue; // Roster seems complete
                 }
 
                 $teamsProcessed++;
@@ -274,14 +281,38 @@ class PlayerController
                 }
             }
 
-            $message = "✅ Synced $synced players from $teamsProcessed teams";
-            if (!empty($errors)) {
-                $message .= " | Errors: " . count($errors);
+            // Calculate progress
+            $newOffset = $offset + $batchSize;
+            $hasMore = $newOffset < $totalTeams;
+            $progress = min(100, round(($newOffset / $totalTeams) * 100));
+
+            // Build continue URL
+            $continueParams = ['offset' => $newOffset];
+            if ($gameFilter && $gameFilter !== 'all') {
+                $continueParams['game'] = $gameFilter;
             }
+            if ($force) {
+                $continueParams['force'] = 1;
+            }
+            $continueUrl = 'players/sync-from-teams?' . http_build_query($continueParams);
+
+            // Build message
+            $message = "✅ Batch complete! Synced $synced players from $teamsProcessed teams";
+            if ($teamsSkipped > 0) {
+                $message .= " (skipped $teamsSkipped with complete rosters)";
+            }
+            $message .= " | Progress: $progress% ({$newOffset}/{$totalTeams})";
+
+            if ($hasMore) {
+                $message .= " | <a href='{$continueUrl}' class='underline text-emerald-300 hover:text-emerald-100'>⏩ Continue syncing next batch</a>";
+            } else {
+                $message .= " | ✨ All teams processed!";
+            }
+
             $_SESSION['message'] = $message;
 
-            if (!empty($errors) && count($errors) <= 3) {
-                $_SESSION['error'] = implode(', ', $errors);
+            if (!empty($errors)) {
+                $_SESSION['error'] = "Errors: " . implode(', ', array_slice($errors, 0, 3));
             }
         } catch (\Exception $e) {
             $_SESSION['error'] = "Sync error: " . $e->getMessage();

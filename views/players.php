@@ -80,7 +80,7 @@
 <!-- Status Messages -->
 <?php if (!empty($message)): ?>
     <div class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-sm">
-        <p class="text-emerald-400 text-sm"><?= htmlspecialchars($message) ?></p>
+        <p class="text-emerald-400 text-sm"><?= $message ?></p>
     </div>
 <?php endif; ?>
 

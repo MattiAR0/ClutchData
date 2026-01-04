@@ -462,13 +462,12 @@ class TeamScraper
                     }
                 });
             }
-
         } catch (Exception $e) {
             error_log("Error extracting roster: " . $e->getMessage());
         }
 
         // Limit to maximum typical roster size
-        return array_slice($players, 0, 7);
+        return array_slice($players, 0, 10);
     }
 
     /**
@@ -649,7 +648,6 @@ class TeamScraper
                     }
                 });
             }
-
         } catch (Exception $e) {
             error_log("Error extracting results: " . $e->getMessage());
         }

@@ -11,6 +11,7 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
 - [x] Mejorar diseño de la página principal (más agradable, Tailwind).
 - [x] Ordenar tabla de partidos por fecha e Importancia.
 - [x] Implementar VlrScraper híbrido para stats avanzadas (ACS, ADR, KAST, HS%).
+- [ ] Implementar HltvScraper para CS2 (pendiente: HLTV usa Cloudflare, requiere bypass).
 
 ## 🚀 Fase 1: Configuración Inicial (Skeleton)
 
