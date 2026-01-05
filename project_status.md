@@ -48,9 +48,9 @@ Este archivo rastrea el estado de todas las tareas necesarias para completar el 
 
 ## 🧠 Fase 3: Inteligencia y Lógica
 
-- [ ] **Sistema de Predicción**
-    - [ ] Definir algoritmo básico de predicción para `ai_prediction` (Simulado por ahora).
-    - [ ] Implementar cálculo en el modelo o clase dedicada.
+- [x] **Sistema de Predicción**
+    - [x] Definir algoritmo ELO + Head-to-Head para `ai_prediction`.
+    - [x] Implementar `MatchPredictor.php` con cálculo real de predicciones.
 
 ## 🎨 Fase 4: Frontend y Visualización
 

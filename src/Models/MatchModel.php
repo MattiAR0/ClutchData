@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Classes\Database;
+use App\Classes\MatchPredictor;
 use PDO;
 
 class MatchModel
 {
     private PDO $db;
+    private ?MatchPredictor $predictor = null;
 
     public function __construct()
     {
@@ -32,7 +34,7 @@ class MatchModel
         ");
 
         foreach ($matches as $match) {
-            $prediction = $this->calculateAiPrediction($match['team1'], $match['team2']);
+            $prediction = $this->calculateAiPrediction($match['team1'], $match['team2'], $match['game_type']);
 
             $stmt->execute([
                 ':game_type' => $match['game_type'],
@@ -55,7 +57,15 @@ class MatchModel
 
     public function getAllMatches(?string $gameType = null, ?string $region = null, ?string $status = null): array
     {
-        $sql = "SELECT * FROM matches";
+        $sql = "SELECT *, 
+                CASE 
+                    WHEN match_status = 'live' THEN 1
+                    WHEN match_status = 'upcoming' AND match_time >= NOW() THEN 2
+                    WHEN DATE(match_time) = CURDATE() THEN 3
+                    WHEN match_status = 'upcoming' AND match_time < NOW() THEN 4
+                    ELSE 5
+                END as sort_priority
+                FROM matches";
         $params = [];
         $conditions = [];
 
@@ -71,31 +81,41 @@ class MatchModel
 
         if ($status && $status !== 'all') {
             if ($status === 'upcoming') {
-                $conditions[] = "match_status = 'upcoming'";
+                // UPCOMING = status pending AND date is in the future (or today)
+                $conditions[] = "(match_status = 'upcoming' AND match_time >= CURDATE())";
             } elseif ($status === 'completed') {
-                $conditions[] = "match_status != 'upcoming'"; // Covers 'completed', 'live'
+                // COMPLETED = has scores OR past date with 'upcoming' status (missed/postponed)
+                $conditions[] = "(match_status IN ('completed', 'live') OR (match_status = 'upcoming' AND match_time < CURDATE()))";
             }
         } else {
-            // ANY STATUS: Show upcoming matches + completed only from today
-            $conditions[] = "(match_status = 'upcoming' OR (match_status != 'upcoming' AND DATE(match_time) = CURDATE()))";
+            // ANY STATUS: Show today's matches + real upcoming (future) + live
+            // Exclude old 'upcoming' matches that are clearly past and irrelevant
+            $conditions[] = "(
+                match_status = 'live' OR
+                (match_status = 'upcoming' AND match_time >= CURDATE()) OR
+                (match_status = 'completed' AND match_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY))
+            )";
         }
 
         if (!empty($conditions)) {
             $sql .= " WHERE " . implode(" AND ", $conditions);
         }
 
-        // Sorting logic:
-        // If status is UPCOMING, we want match_time ASC (Nearest future first)
-        // If status is COMPLETED, we want match_time DESC (Most recent completed first)
-        // If status is ALL, show upcoming first (sorted by nearest), then today's completed
-
+        // Sorting: 
+        // 1. LIVE matches first
+        // 2. Upcoming starting soonest (closest to now)
+        // 3. Today's completed
+        // 4. Everything else by recency
         if ($status === 'upcoming') {
             $sql .= " ORDER BY match_time ASC, match_importance DESC";
         } elseif ($status === 'completed') {
             $sql .= " ORDER BY match_time DESC, match_importance DESC";
         } else {
-            // ANY STATUS: Upcoming first (by nearest time), then completed from today
-            $sql .= " ORDER BY (match_status = 'upcoming') DESC, match_time ASC, match_importance DESC";
+            // Default: Priority order (live > upcoming today > today completed > old)
+            $sql .= " ORDER BY sort_priority ASC, 
+                      CASE WHEN sort_priority <= 3 THEN match_time END ASC,
+                      CASE WHEN sort_priority > 3 THEN match_time END DESC,
+                      match_importance DESC";
         }
 
         $stmt = $this->db->prepare($sql);
@@ -203,15 +223,31 @@ class MatchModel
         return $this->db;
     }
 
-    private function calculateAiPrediction(string $team1, string $team2): float
+    /**
+     * Calculate AI prediction for a match using ELO + Head-to-Head
+     * 
+     * @param string $team1 First team name
+     * @param string $team2 Second team name
+     * @param string $gameType Game type (valorant, lol, cs2)
+     * @return float Win probability for team1 (0-100)
+     */
+    private function calculateAiPrediction(string $team1, string $team2, string $gameType = 'valorant'): float
     {
-        // "Algoritmo Complejo de Predicción" ;)
-        // Hash de los nombres para que la "predicción" sea consistente para el mismo partido
-        $hash = crc32($team1 . $team2);
+        if ($this->predictor === null) {
+            $this->predictor = new MatchPredictor($this->db);
+        }
 
-        // Normalizar entre 0 y 100
-        $percentage = abs($hash % 10000) / 100;
+        return $this->predictor->predictMatch($team1, $team2, $gameType);
+    }
 
-        return $percentage;
+    /**
+     * Get the MatchPredictor instance
+     */
+    public function getPredictor(): MatchPredictor
+    {
+        if ($this->predictor === null) {
+            $this->predictor = new MatchPredictor($this->db);
+        }
+        return $this->predictor;
     }
 }
