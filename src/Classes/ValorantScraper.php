@@ -381,6 +381,35 @@ class ValorantScraper extends LiquipediaScraper
             }
         });
 
+
+        // New Liquipedia structure (match-bm)
+        if (empty($details['maps'])) {
+            $crawler->filter('div[data-toggle-area-content]')->each(function (Crawler $node) use (&$details) {
+                // Determine if this area content is a map (usually has a map name inside)
+                $mapNameNode = $node->filter('div.match-bm-lol-game-summary-map, div.match-bm-game-summary-map');
+                if ($mapNameNode->count()) {
+                    $mapName = trim($mapNameNode->text());
+                    $scoreNode = $node->filter('div.match-bm-lol-game-summary-score, div.match-bm-game-summary-score');
+                    $score = $scoreNode->count() ? trim($scoreNode->text()) : '';
+
+                    if ($score) {
+                        // Handle non-breaking hyphens or other separators
+                        $score = str_replace(["\xe2\x80\x91", "&#8209;"], '-', $score);
+                        $parts = explode('-', $score);
+
+                        // Sometimes map name covers "Overall", skip it
+                        if (stripos($mapName, 'Overall') === false) {
+                            $details['maps'][] = [
+                                'name' => $mapName,
+                                'score1' => isset($parts[0]) ? trim($parts[0]) : '0',
+                                'score2' => isset($parts[1]) ? trim($parts[1]) : '0'
+                            ];
+                        }
+                    }
+                }
+            });
+        }
+
         // Fallback for maps
         if (empty($details['maps'])) {
             $crawler->filter('div.match-history-game')->each(function (Crawler $node) use (&$details) {
@@ -390,6 +419,7 @@ class ValorantScraper extends LiquipediaScraper
                 $score = $scoreNode->count() ? $scoreNode->text() : '';
 
                 if ($score) {
+                    $score = str_replace(["\xe2\x80\x91", "&#8209;"], '-', $score);
                     $parts = explode('-', $score);
                     $details['maps'][] = [
                         'name' => $mapName,
