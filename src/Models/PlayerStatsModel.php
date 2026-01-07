@@ -20,22 +20,25 @@ class PlayerStatsModel
 
     /**
      * Guarda estadísticas de jugadores para un partido
+     * @param int $matchId ID del partido
+     * @param array $players Array de estadísticas de jugadores
+     * @param string $mapName Nombre del mapa ('overall' para stats agregadas)
      */
-    public function saveStats(int $matchId, array $players): bool
+    public function saveStats(int $matchId, array $players, string $mapName = 'overall'): bool
     {
         if (empty($players)) {
             return false;
         }
 
-        // Eliminar stats anteriores de este partido
-        $this->deleteByMatch($matchId);
+        // Eliminar stats anteriores de este partido y mapa
+        $this->deleteByMatchAndMap($matchId, $mapName);
 
         $sql = "INSERT INTO player_stats 
                 (match_id, player_name, team_name, agent, kills, deaths, assists, 
-                 acs, adr, kast, hs_percent, rating, first_bloods, first_deaths, clutches, data_source) 
+                 acs, adr, kast, hs_percent, rating, first_bloods, first_deaths, clutches, data_source, map_name) 
                 VALUES 
                 (:match_id, :player_name, :team_name, :agent, :kills, :deaths, :assists,
-                 :acs, :adr, :kast, :hs_percent, :rating, :first_bloods, :first_deaths, :clutches, :data_source)";
+                 :acs, :adr, :kast, :hs_percent, :rating, :first_bloods, :first_deaths, :clutches, :data_source, :map_name)";
 
         $stmt = $this->db->prepare($sql);
 
@@ -57,7 +60,8 @@ class PlayerStatsModel
                     ':first_bloods' => $player['first_bloods'] ?? null,
                     ':first_deaths' => $player['first_deaths'] ?? null,
                     ':clutches' => $player['clutches'] ?? null,
-                    ':data_source' => $player['data_source'] ?? 'liquipedia'
+                    ':data_source' => $player['data_source'] ?? 'liquipedia',
+                    ':map_name' => $mapName
                 ]);
             } catch (\PDOException $e) {
                 error_log("PlayerStatsModel saveStats error: " . $e->getMessage());
@@ -159,6 +163,106 @@ class PlayerStatsModel
         $sql = "DELETE FROM player_stats WHERE match_id = :match_id";
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([':match_id' => $matchId]);
+    }
+
+    /**
+     * Elimina estadísticas de un partido y mapa específico
+     */
+    public function deleteByMatchAndMap(int $matchId, string $mapName): bool
+    {
+        $sql = "DELETE FROM player_stats WHERE match_id = :match_id AND map_name = :map_name";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([':match_id' => $matchId, ':map_name' => $mapName]);
+    }
+
+    /**
+     * Obtiene los mapas disponibles para un partido
+     */
+    public function getAvailableMaps(int $matchId): array
+    {
+        $sql = "SELECT DISTINCT map_name FROM player_stats WHERE match_id = :match_id ORDER BY 
+                CASE WHEN map_name = 'overall' THEN 0 ELSE 1 END, map_name";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':match_id' => $matchId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    /**
+     * Obtiene estadísticas de un partido para un mapa específico
+     */
+    public function getStatsByMatchAndMap(int $matchId, ?string $mapName = null): array
+    {
+        if ($mapName === null) {
+            return $this->getStatsByMatch($matchId);
+        }
+
+        $sql = "SELECT * FROM player_stats WHERE match_id = :match_id AND map_name = :map_name ORDER BY team_name, kills DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':match_id' => $matchId, ':map_name' => $mapName]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Calcula stats overall sumando stats de todos los mapas
+     * Útil cuando solo hay datos por mapa pero no agregados
+     */
+    public function calculateOverallFromMaps(int $matchId): array
+    {
+        $sql = "SELECT 
+                    player_name,
+                    team_name,
+                    GROUP_CONCAT(DISTINCT agent) as agent,
+                    SUM(kills) as kills,
+                    SUM(deaths) as deaths,
+                    SUM(assists) as assists,
+                    AVG(acs) as acs,
+                    AVG(adr) as adr,
+                    AVG(kast) as kast,
+                    AVG(hs_percent) as hs_percent,
+                    AVG(rating) as rating,
+                    SUM(first_bloods) as first_bloods,
+                    SUM(first_deaths) as first_deaths,
+                    MAX(data_source) as data_source
+                FROM player_stats 
+                WHERE match_id = :match_id AND map_name != 'overall'
+                GROUP BY player_name, team_name
+                ORDER BY team_name, kills DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':match_id' => $matchId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtiene stats agrupadas por equipo, con soporte para mapa específico
+     */
+    public function getStatsByMatchGroupedWithMap(int $matchId, ?string $mapName = null): array
+    {
+        $stats = $mapName ? $this->getStatsByMatchAndMap($matchId, $mapName) : $this->getStatsByMatch($matchId);
+
+        // Si no hay stats overall, calcular desde mapas
+        if (empty($stats) && ($mapName === null || $mapName === 'overall')) {
+            $stats = $this->calculateOverallFromMaps($matchId);
+        }
+
+        $grouped = [
+            'team1' => [],
+            'team2' => []
+        ];
+
+        $teams = [];
+        foreach ($stats as $player) {
+            if (!in_array($player['team_name'], $teams)) {
+                $teams[] = $player['team_name'];
+            }
+        }
+
+        foreach ($stats as $player) {
+            $teamKey = ($player['team_name'] === ($teams[0] ?? '')) ? 'team1' : 'team2';
+            $grouped[$teamKey][] = $player;
+        }
+
+        return $grouped;
     }
 
     /**

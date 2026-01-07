@@ -128,7 +128,7 @@ class MatchController
             exit;
         }
 
-        // On-demand scraping for details
+        // On-demand scraping for Liquipedia details (fast - usually cached)
         if (empty($match['match_details']) && !empty($match['match_url'])) {
             try {
                 $scraper = match ($match['game_type']) {
@@ -142,98 +142,42 @@ class MatchController
                     $details = $scraper->scrapeMatchDetails($match['match_url']);
                     if (!empty($details)) {
                         $this->model->updateMatchDetails($match['id'], $details);
-                        // Refresh match data
                         $match['match_details'] = json_encode($details);
-                        // Also merge into array for view usage if needed
                     }
                 }
             } catch (Exception $e) {
-                // Log error or ignore, simpler to just show what we have
                 error_log("Failed to scrape details: " . $e->getMessage());
             }
         }
 
-        // Enriquecer con VLR.gg stats para Valorant
+        // Check if we have cached VLR/HLTV stats (NO BLOCKING SCRAPING)
         $vlrStats = [];
-        if ($match['game_type'] === 'valorant' && $match['match_status'] === 'completed') {
-            try {
-                $playerStatsModel = new PlayerStatsModel($this->model->getConnection());
-
-                // Verificar si ya tenemos stats de VLR
-                if (!$playerStatsModel->hasVlrStats($match['id'])) {
-                    // Intentar obtener stats de VLR.gg
-                    $vlrScraper = new VlrScraper();
-
-                    // Si ya tenemos vlr_match_id, usarlo directamente
-                    if (!empty($match['vlr_match_id'])) {
-                        $vlrDetails = $vlrScraper->scrapeMatchDetails($match['vlr_match_id']);
-                        if (!empty($vlrDetails['players'])) {
-                            $playerStatsModel->saveStats($match['id'], $vlrDetails['players']);
-                        }
-                    } else {
-                        // Buscar por nombres de equipo
-                        $vlrMatchId = $vlrScraper->findMatchByTeams(
-                            $match['team1_name'],
-                            $match['team2_name'],
-                            $match['match_time']
-                        );
-
-                        if ($vlrMatchId) {
-                            $this->model->updateVlrMatchId($match['id'], $vlrMatchId);
-                            $vlrDetails = $vlrScraper->scrapeMatchDetails($vlrMatchId);
-                            if (!empty($vlrDetails['players'])) {
-                                $playerStatsModel->saveStats($match['id'], $vlrDetails['players']);
-                            }
-                        }
-                    }
-                }
-
-                // Obtener stats guardadas
-                $vlrStats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
-            } catch (Exception $e) {
-                error_log("Failed to enrich with VLR stats: " . $e->getMessage());
-            }
-        }
-
-        // Enriquecer con HLTV stats para CS2
         $hltvStats = [];
-        if ($match['game_type'] === 'cs2' && $match['match_status'] === 'completed') {
+        $needsAsyncStats = false;
+
+        if ($match['match_status'] === 'completed') {
             try {
                 $playerStatsModel = new PlayerStatsModel($this->model->getConnection());
 
-                // Verificar si ya tenemos stats de HLTV
-                if (!$playerStatsModel->hasHltvStats($match['id'])) {
-                    // Intentar obtener stats de HLTV
-                    $hltvScraper = new HltvScraper();
-
-                    // Si ya tenemos hltv_match_id, usarlo directamente
-                    if (!empty($match['hltv_match_id'])) {
-                        $hltvDetails = $hltvScraper->scrapeMatchDetails($match['hltv_match_id']);
-                        if (!empty($hltvDetails['players'])) {
-                            $playerStatsModel->saveStats($match['id'], $hltvDetails['players']);
-                        }
+                if ($match['game_type'] === 'valorant') {
+                    // Only check cache, don't scrape
+                    if ($playerStatsModel->hasVlrStats($match['id'])) {
+                        $vlrStats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
                     } else {
-                        // Buscar por nombres de equipo
-                        $hltvMatchId = $hltvScraper->findMatchByTeams(
-                            $match['team1_name'],
-                            $match['team2_name'],
-                            $match['match_time']
-                        );
-
-                        if ($hltvMatchId) {
-                            $this->model->updateHltvMatchId($match['id'], $hltvMatchId);
-                            $hltvDetails = $hltvScraper->scrapeMatchDetails($hltvMatchId);
-                            if (!empty($hltvDetails['players'])) {
-                                $playerStatsModel->saveStats($match['id'], $hltvDetails['players']);
-                            }
-                        }
+                        // Mark for async loading via AJAX
+                        $needsAsyncStats = true;
+                    }
+                } elseif ($match['game_type'] === 'cs2') {
+                    // Only check cache, don't scrape
+                    if ($playerStatsModel->hasHltvStats($match['id'])) {
+                        $hltvStats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                    } else {
+                        // Mark for async loading via AJAX
+                        $needsAsyncStats = true;
                     }
                 }
-
-                // Obtener stats guardadas
-                $hltvStats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
             } catch (Exception $e) {
-                error_log("Failed to enrich with HLTV stats: " . $e->getMessage());
+                error_log("Failed to check cached stats: " . $e->getMessage());
             }
         }
 
@@ -241,6 +185,7 @@ class MatchController
         $match['details_decoded'] = !empty($match['match_details']) ? json_decode($match['match_details'], true) : [];
         $match['vlr_stats'] = $vlrStats;
         $match['hltv_stats'] = $hltvStats;
+        $match['needs_async_stats'] = $needsAsyncStats;
 
         // Merge stats from both sources (VLR/HLTV prioritized, Liquipedia as fallback)
         $match['merged_stats'] = $this->mergePlayerStats($match);

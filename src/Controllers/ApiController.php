@@ -7,7 +7,10 @@ namespace App\Controllers;
 use App\Models\MatchModel;
 use App\Models\TeamModel;
 use App\Models\PlayerModel;
+use App\Models\PlayerStatsModel;
 use App\Classes\Logger;
+use App\Classes\VlrScraper;
+use App\Classes\HltvScraper;
 use Exception;
 
 /**
@@ -274,5 +277,165 @@ class ApiController
         header('Access-Control-Allow-Headers: Content-Type');
         http_response_code(204);
         exit;
+    }
+
+    /**
+     * GET /api/match/stats
+     * Obtiene estadísticas avanzadas de un partido (VLR/HLTV) de forma asíncrona.
+     * Este endpoint realiza scraping solo si las stats no están cacheadas.
+     * 
+     * Query params:
+     *   - id: Match ID (requerido)
+     * 
+     * Response:
+     *   - cached: boolean indicando si los datos estaban en caché
+     *   - stats: array de estadísticas de jugadores agrupadas por equipo
+     */
+    public function getMatchStats(): void
+    {
+        try {
+            $id = $_GET['id'] ?? null;
+
+            if (!$id || !is_numeric($id)) {
+                $this->errorResponse('Match ID is required and must be numeric', 400);
+            }
+
+            $match = $this->matchModel->getMatchById((int) $id);
+
+            if (!$match) {
+                $this->errorResponse('Match not found', 404);
+            }
+
+            $playerStatsModel = new PlayerStatsModel($this->matchModel->getConnection());
+            $stats = [];
+            $cached = false;
+            $source = null;
+
+            // Valorant: usar VLR.gg
+            if ($match['game_type'] === 'valorant' && $match['match_status'] === 'completed') {
+                // Verificar si ya tenemos stats cacheadas
+                if ($playerStatsModel->hasVlrStats($match['id'])) {
+                    $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                    $cached = true;
+                    $source = 'vlr';
+                } else {
+                    // Scraping asíncrono
+                    try {
+                        $vlrScraper = new VlrScraper();
+                        $vlrMatchId = $match['vlr_match_id'];
+
+                        // Buscar por nombres de equipo si no tenemos vlr_match_id
+                        if (empty($vlrMatchId)) {
+                            $vlrMatchId = $vlrScraper->findMatchByTeams(
+                                $match['team1_name'],
+                                $match['team2_name'],
+                                $match['match_time']
+                            );
+                            if ($vlrMatchId) {
+                                $this->matchModel->updateVlrMatchId($match['id'], $vlrMatchId);
+                            }
+                        }
+
+                        if ($vlrMatchId) {
+                            $vlrDetails = $vlrScraper->scrapeMatchDetails($vlrMatchId);
+
+                            // Guardar stats overall
+                            if (!empty($vlrDetails['players'])) {
+                                $playerStatsModel->saveStats($match['id'], $vlrDetails['players'], 'overall');
+                            }
+
+                            // Guardar stats por mapa
+                            if (!empty($vlrDetails['players_by_map'])) {
+                                foreach ($vlrDetails['players_by_map'] as $mapName => $mapPlayers) {
+                                    $playerStatsModel->saveStats($match['id'], $mapPlayers, $mapName);
+                                }
+                            }
+
+                            $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                            $source = 'vlr';
+                        }
+                    } catch (Exception $e) {
+                        $this->logger->warning("VLR scraping failed", ['error' => $e->getMessage()]);
+                    }
+                }
+            }
+
+            // CS2: usar HLTV
+            if ($match['game_type'] === 'cs2' && $match['match_status'] === 'completed') {
+                // Verificar si ya tenemos stats cacheadas
+                if ($playerStatsModel->hasHltvStats($match['id'])) {
+                    $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                    $cached = true;
+                    $source = 'hltv';
+                } else {
+                    // Scraping asíncrono
+                    try {
+                        $hltvScraper = new HltvScraper();
+
+                        // Si ya tenemos hltv_match_id, usarlo directamente
+                        if (!empty($match['hltv_match_id'])) {
+                            $hltvDetails = $hltvScraper->scrapeMatchDetails($match['hltv_match_id']);
+                            if (!empty($hltvDetails['players'])) {
+                                $playerStatsModel->saveStats($match['id'], $hltvDetails['players']);
+                                $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                                $source = 'hltv';
+                            }
+                        } else {
+                            // Buscar por nombres de equipo
+                            $hltvMatchId = $hltvScraper->findMatchByTeams(
+                                $match['team1_name'],
+                                $match['team2_name'],
+                                $match['match_time']
+                            );
+
+                            if ($hltvMatchId) {
+                                $this->matchModel->updateHltvMatchId($match['id'], $hltvMatchId);
+                                $hltvDetails = $hltvScraper->scrapeMatchDetails($hltvMatchId);
+                                if (!empty($hltvDetails['players'])) {
+                                    $playerStatsModel->saveStats($match['id'], $hltvDetails['players']);
+                                    $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                                    $source = 'hltv';
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $this->logger->warning("HLTV scraping failed", ['error' => $e->getMessage()]);
+                    }
+                }
+            }
+
+            // LoL y otros: devolver stats de Liquipedia si existen
+            if (empty($stats) && !empty($match['match_details'])) {
+                $details = json_decode($match['match_details'], true);
+                if (!empty($details['players'])) {
+                    $stats = $details['players'];
+                    $source = 'liquipedia';
+                    $cached = true;
+                }
+            }
+
+            // Obtener mapas disponibles y filtrar si se especifica
+            $mapFilter = $_GET['map'] ?? null;
+            $availableMaps = $playerStatsModel->getAvailableMaps($match['id']);
+
+            // Si se solicita un mapa específico, obtener stats de ese mapa
+            if ($mapFilter && in_array($mapFilter, $availableMaps)) {
+                $stats = $playerStatsModel->getStatsByMatchGroupedWithMap($match['id'], $mapFilter);
+            }
+
+            $this->jsonResponse([
+                'success' => true,
+                'cached' => $cached,
+                'source' => $source,
+                'match_id' => (int) $id,
+                'game_type' => $match['game_type'],
+                'available_maps' => $availableMaps,
+                'current_map' => $mapFilter ?? 'overall',
+                'stats' => $stats
+            ]);
+        } catch (Exception $e) {
+            $this->logger->error("API getMatchStats error", ['error' => $e->getMessage()]);
+            $this->errorResponse('Error retrieving match stats: ' . $e->getMessage(), 500);
+        }
     }
 }

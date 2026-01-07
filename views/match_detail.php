@@ -434,6 +434,216 @@
                 </div>
             <?php endif; ?>
 
+            <!-- Async Loading Placeholder for Stats (when not cached) -->
+            <?php if (!empty($match['needs_async_stats'])): ?>
+                <div id="async-stats-container" class="mb-16">
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                        <h3 class="text-lg font-bold text-white uppercase tracking-[0.2em] flex items-center gap-3">
+                            <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            Player Statistics
+                        </h3>
+                        <div class="h-px bg-zinc-800 flex-grow"></div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="stats-loading" class="text-center py-12">
+                        <div class="inline-flex flex-col items-center gap-4">
+                            <div class="relative">
+                                <div
+                                    class="w-12 h-12 border-4 border-zinc-700 border-t-indigo-500 rounded-full animate-spin">
+                                </div>
+                            </div>
+                            <p class="text-zinc-500 text-sm font-mono">Loading advanced statistics...</p>
+                            <p class="text-zinc-600 text-xs">
+                                <?= $match['game_type'] === 'valorant' ? 'Fetching from VLR.gg' : 'Fetching from HLTV' ?>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Stats Content (replaced by JavaScript) -->
+                    <div id="stats-content" class="hidden"></div>
+                </div>
+
+                <script>
+                    (function () {
+                        const matchId = <?= (int) $match['id'] ?>;
+                        const gameType = '<?= htmlspecialchars($match['game_type']) ?>';
+                        const team1Name = '<?= htmlspecialchars(addslashes($match['team1_name'])) ?>';
+                        const team2Name = '<?= htmlspecialchars(addslashes($match['team2_name'])) ?>';
+
+                        const loadingEl = document.getElementById('stats-loading');
+                        const contentEl = document.getElementById('stats-content');
+
+                        let availableMaps = [];
+                        let currentMap = 'overall';
+
+                        fetch(`./api/match/stats?id=${matchId}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success && data.stats && Object.keys(data.stats).length > 0) {
+                                    availableMaps = data.available_maps || [];
+                                    currentMap = data.current_map || 'overall';
+                                    renderStats(data.stats, data.source, availableMaps, currentMap);
+                                } else {
+                                    loadingEl.innerHTML = `
+                                    <div class="text-center py-8">
+                                        <p class="text-zinc-500 text-sm">No detailed statistics available for this match.</p>
+                                    </div>
+                                `;
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error loading stats:', error);
+                                loadingEl.innerHTML = `
+                                <div class="text-center py-8">
+                                    <p class="text-zinc-500 text-sm">Failed to load statistics. Please refresh the page.</p>
+                                </div>
+                            `;
+                            });
+
+                        function loadMapStats(mapName) {
+                            currentMap = mapName;
+                            contentEl.innerHTML = '<div class="text-center py-8"><div class="w-8 h-8 border-4 border-zinc-700 border-t-indigo-500 rounded-full animate-spin mx-auto"></div></div>';
+                            
+                            fetch(`./api/match/stats?id=${matchId}&map=${encodeURIComponent(mapName)}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success && data.stats) {
+                                        renderStats(data.stats, data.source, availableMaps, mapName);
+                                    }
+                                })
+                                .catch(console.error);
+                        }
+
+                        function renderStats(stats, source, maps, activeMap) {
+                            const sourceBadge = source === 'vlr'
+                                ? '<span class="inline-flex items-center px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-[10px] text-rose-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2 animate-pulse"></span>VLR.gg Stats</span>'
+                                : source === 'hltv'
+                                    ? '<span class="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-[10px] text-orange-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 animate-pulse"></span>HLTV Stats</span>'
+                                    : '<span class="inline-flex items-center px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] text-blue-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span>Liquipedia Stats</span>';
+
+                            const hasAdvanced = source === 'vlr' || source === 'hltv';
+                            const isHltv = source === 'hltv';
+
+                            // Map tabs (only show if more than just 'overall')
+                            let tabsHtml = '';
+                            if (maps && maps.length > 1) {
+                                tabsHtml = '<div class="flex flex-wrap justify-center gap-2 mb-6">';
+                                maps.forEach(map => {
+                                    const isActive = map === activeMap;
+                                    const activeClass = isActive 
+                                        ? 'bg-indigo-600 text-white border-indigo-500' 
+                                        : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700 hover:text-white';
+                                    const label = map === 'overall' ? 'All Maps' : map;
+                                    tabsHtml += `<button onclick="window.loadMapStats('${escapeHtml(map)}')" class="px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded-lg transition-all ${activeClass}">${escapeHtml(label)}</button>`;
+                                });
+                                tabsHtml += '</div>';
+                            }
+
+                            let html = `<div class="flex justify-center gap-2 mb-4">${sourceBadge}</div>`;
+                            html += tabsHtml;
+                            html += '<div class="grid grid-cols-1 xl:grid-cols-2 gap-8">';
+
+                            const teams = [
+                                { name: team1Name, players: stats.team1 || [], color: 'indigo' },
+                                { name: team2Name, players: stats.team2 || [], color: 'rose' }
+                            ];
+
+                            teams.forEach(team => {
+                                if (!team.players || team.players.length === 0) return;
+
+                                html += `
+                                <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+                                    <div class="px-6 py-4 bg-gradient-to-r from-${team.color}-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
+                                        <h4 class="text-lg font-black text-white italic tracking-wide">${escapeHtml(team.name)}</h4>
+                                        <span class="text-xs font-mono text-zinc-500 uppercase">${team.players.length} Players</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left">
+                                            <thead>
+                                                <tr class="border-b border-zinc-800 bg-zinc-900/80">
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Player</th>
+                                                    ${isHltv ? '<th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">Rating</th>'
+                                    : hasAdvanced ? '<th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">ACS</th>' : ''}
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">K</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">D</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">A</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">K/D</th>
+                                                    ${hasAdvanced ? '<th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">ADR</th><th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">KAST</th>' : ''}
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-zinc-800/50">
+                                                ${team.players.map(p => renderPlayerRow(p, hasAdvanced, isHltv)).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            `;
+                            });
+
+                            html += '</div>';
+
+                            loadingEl.classList.add('hidden');
+                            contentEl.innerHTML = html;
+                            contentEl.classList.remove('hidden');
+                        }
+
+                        // Expose loadMapStats to global scope for button onclick
+                        window.loadMapStats = loadMapStats;
+
+                        function renderPlayerRow(player, hasAdvanced, isHltv) {
+                            const kills = player.kills || 0;
+                            const deaths = player.deaths || 0;
+                            const kd = deaths > 0 ? kills / deaths : kills;
+                            const kdColor = kd >= 1.0 ? 'text-emerald-400' : 'text-rose-400';
+
+                            const rating = player.rating;
+                            const ratingColor = rating !== null ? (rating >= 1.10 ? 'text-emerald-400' : (rating >= 1.0 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                            const acs = player.acs;
+                            const acsColor = acs !== null ? (acs >= 250 ? 'text-emerald-400' : (acs >= 200 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                            const kast = player.kast;
+                            const kastColor = kast !== null ? (kast >= 75 ? 'text-emerald-400' : (kast >= 60 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                            const playerName = player.player_name || player.name || 'Unknown';
+                            const agent = player.agent;
+
+                            return `
+                            <tr class="group hover:bg-white/[0.02] transition-colors">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        ${agent ? `<span class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">${escapeHtml(agent)}</span>` : ''}
+                                        <span class="font-bold text-zinc-200 text-sm">${escapeHtml(playerName)}</span>
+                                    </div>
+                                </td>
+                                ${isHltv ? `<td class="px-3 py-3 text-center font-mono text-sm font-bold ${ratingColor}">${rating !== null ? rating.toFixed(2) : '-'}</td>`
+                                : hasAdvanced ? `<td class="px-3 py-3 text-center font-mono text-sm font-bold ${acsColor}">${acs !== null ? acs : '-'}</td>` : ''}
+                                <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300 font-medium">${kills}</td>
+                                <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">${deaths}</td>
+                                <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">${player.assists || 0}</td>
+                                <td class="px-3 py-3 text-center font-mono text-sm font-bold ${kdColor}">${kd.toFixed(2)}</td>
+                                ${hasAdvanced ? `
+                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">${player.adr !== null ? player.adr.toFixed(1) : '-'}</td>
+                                    <td class="px-3 py-3 text-center font-mono text-sm ${kastColor}">${kast !== null ? kast.toFixed(1) + '%' : '-'}</td>
+                                ` : ''}
+                            </tr>
+                        `;
+                        }
+
+                        function escapeHtml(text) {
+                            const div = document.createElement('div');
+                            div.textContent = text;
+                            return div.innerHTML;
+                        }
+                    })();
+                </script>
+            <?php endif; ?>
+
             <!-- External Link -->
             <?php if (!empty($match['match_url'])): ?>
                 <div class="text-center">

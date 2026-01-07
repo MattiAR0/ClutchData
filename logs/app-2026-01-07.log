@@ -1,0 +1,2 @@
+[2026-01-07T11:41:22.204074+00:00] clutchdata.INFO: API access {"endpoint":"/ClutchData/public/api/match/stats?id=267","method":"GET","status_code":200,"ip":"::1"} []
+[2026-01-07T11:42:01.732258+00:00] clutchdata.INFO: API access {"endpoint":"/ClutchData/public/api/match/stats?id=271","method":"GET","status_code":200,"ip":"::1"} []

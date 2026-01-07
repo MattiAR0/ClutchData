@@ -55,6 +55,7 @@ $router->get('/player', [PlayerController::class, 'show']);
 // ============================================
 $router->get('/api/matches', [ApiController::class, 'getMatches']);
 $router->get('/api/match', [ApiController::class, 'getMatch']);
+$router->get('/api/match/stats', [ApiController::class, 'getMatchStats']);
 $router->get('/api/teams', [ApiController::class, 'getTeams']);
 $router->get('/api/team', [ApiController::class, 'getTeam']);
 $router->get('/api/stats', [ApiController::class, 'getStats']);

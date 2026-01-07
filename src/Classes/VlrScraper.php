@@ -235,6 +235,9 @@ class VlrScraper implements ScraperInterface
 
     /**
      * Scrape estadísticas detalladas de un partido
+     * Ahora extrae stats por mapa además de las overall
+     * 
+     * @return array ['maps' => [...], 'players' => [...], 'players_by_map' => ['Ascent' => [...], ...]]
      */
     public function scrapeMatchDetails(string $vlrMatchId): array
     {
@@ -248,7 +251,8 @@ class VlrScraper implements ScraperInterface
         $details = [
             'vlr_match_id' => $vlrMatchId,
             'maps' => [],
-            'players' => []
+            'players' => [],           // Stats overall (agregadas)
+            'players_by_map' => []     // Stats por mapa
         ];
 
         // Extraer nombres de equipos
@@ -256,26 +260,92 @@ class VlrScraper implements ScraperInterface
         $team1Name = $teamNodes->count() > 0 ? trim($teamNodes->eq(0)->text()) : 'Team1';
         $team2Name = $teamNodes->count() > 1 ? trim($teamNodes->eq(1)->text()) : 'Team2';
 
-        // Mapas jugados
-        $crawler->filter('.vm-stats-game')->each(function (Crawler $mapNode) use (&$details) {
+        // Iterar sobre cada mapa/game
+        $crawler->filter('.vm-stats-game')->each(function (Crawler $mapNode) use (&$details, $team1Name, $team2Name) {
+            // Obtener nombre del mapa
             $mapName = 'Unknown';
             $mapHeader = $mapNode->filter('.map span');
             if ($mapHeader->count()) {
                 $mapName = trim($mapHeader->first()->text());
+                // Limpiar nombre (a veces incluye "PICK" o números)
+                $mapName = preg_replace('/\s*(PICK|BAN|\d+)$/i', '', $mapName);
+                $mapName = trim($mapName);
             }
 
+            // Score del mapa
             $scores = $mapNode->filter('.score');
             $score1 = $scores->count() > 0 ? trim($scores->eq(0)->text()) : '0';
             $score2 = $scores->count() > 1 ? trim($scores->eq(1)->text()) : '0';
 
-            $details['maps'][] = [
-                'name' => $mapName,
-                'score1' => $score1,
-                'score2' => $score2
-            ];
+            // Solo añadir si el mapa tiene nombre válido
+            if ($mapName !== 'Unknown' && $mapName !== '' && $mapName !== 'All Maps') {
+                $details['maps'][] = [
+                    'name' => $mapName,
+                    'score1' => $score1,
+                    'score2' => $score2
+                ];
+
+                // Extraer stats de jugadores para ESTE mapa
+                $mapPlayers = [];
+                $playerIndex = 0;
+
+                $mapNode->filter('table.wf-table-inset tbody tr')->each(function (Crawler $row) use (&$mapPlayers, &$playerIndex, $team1Name, $team2Name, $mapName) {
+                    try {
+                        $cells = $row->filter('td');
+                        if ($cells->count() < 6)
+                            return;
+
+                        $teamName = ($playerIndex < 5) ? $team1Name : $team2Name;
+                        $playerIndex++;
+
+                        $playerCell = $cells->eq(0);
+                        $playerLink = $playerCell->filter('a');
+                        $playerName = $playerLink->count() ? trim($playerLink->text()) : trim($playerCell->text());
+
+                        $agentImg = $playerCell->filter('img.mod-agent');
+                        $agent = $agentImg->count() ? ($agentImg->attr('alt') ?? $agentImg->attr('title') ?? '') : '';
+
+                        $stats = $cells->each(fn($td) => trim($td->text()));
+
+                        $acs = isset($stats[2]) && is_numeric($stats[2]) ? (int) $stats[2] : null;
+                        $kills = isset($stats[3]) ? (int) preg_replace('/\D/', '', $stats[3]) : 0;
+                        $deaths = isset($stats[4]) ? (int) preg_replace('/\D/', '', $stats[4]) : 0;
+                        $assists = isset($stats[5]) ? (int) preg_replace('/\D/', '', $stats[5]) : 0;
+                        $kast = isset($stats[7]) ? (float) str_replace('%', '', $stats[7]) : null;
+                        $adr = isset($stats[8]) ? (float) $stats[8] : null;
+                        $hsPercent = isset($stats[9]) ? (float) str_replace('%', '', $stats[9]) : null;
+                        $firstBloods = isset($stats[10]) ? (int) $stats[10] : null;
+                        $firstDeaths = isset($stats[11]) ? (int) $stats[11] : null;
+
+                        if (!empty($playerName) && $playerName !== 'Player') {
+                            $mapPlayers[] = [
+                                'name' => $playerName,
+                                'team' => $teamName,
+                                'agent' => $agent,
+                                'kills' => $kills,
+                                'deaths' => $deaths,
+                                'assists' => $assists,
+                                'acs' => $acs,
+                                'adr' => $adr,
+                                'kast' => $kast,
+                                'hs_percent' => $hsPercent,
+                                'first_bloods' => $firstBloods,
+                                'first_deaths' => $firstDeaths,
+                                'data_source' => 'vlr'
+                            ];
+                        }
+                    } catch (Exception $e) {
+                        // Skip malformed row
+                    }
+                });
+
+                if (!empty($mapPlayers)) {
+                    $details['players_by_map'][$mapName] = $mapPlayers;
+                }
+            }
         });
 
-        // Estadísticas de jugadores (tabla overview)
+        // Extraer stats OVERALL desde la tabla mod-overview (si existe)
         $playerIndex = 0;
         $crawler->filter('table.wf-table-inset.mod-overview tbody tr')->each(function (Crawler $row) use (&$details, &$playerIndex, $team1Name, $team2Name) {
             try {
@@ -283,20 +353,16 @@ class VlrScraper implements ScraperInterface
                 if ($cells->count() < 6)
                     return;
 
-                // Determinar equipo basado en posición (primeros 5 = team1, siguientes = team2)
                 $teamName = ($playerIndex < 5) ? $team1Name : $team2Name;
                 $playerIndex++;
 
-                // Nombre del jugador
                 $playerCell = $cells->eq(0);
                 $playerLink = $playerCell->filter('a');
                 $playerName = $playerLink->count() ? trim($playerLink->text()) : trim($playerCell->text());
 
-                // Agente
                 $agentImg = $playerCell->filter('img.mod-agent');
                 $agent = $agentImg->count() ? ($agentImg->attr('alt') ?? $agentImg->attr('title') ?? '') : '';
 
-                // Stats (orden: Player, R (rating), ACS, K, D, A, +/-, KAST, ADR, HS%, FK, FD)
                 $stats = $cells->each(fn($td) => trim($td->text()));
 
                 $acs = isset($stats[2]) && is_numeric($stats[2]) ? (int) $stats[2] : null;
@@ -309,21 +375,23 @@ class VlrScraper implements ScraperInterface
                 $firstBloods = isset($stats[10]) ? (int) $stats[10] : null;
                 $firstDeaths = isset($stats[11]) ? (int) $stats[11] : null;
 
-                $details['players'][] = [
-                    'name' => $playerName,
-                    'team' => $teamName,
-                    'agent' => $agent,
-                    'kills' => $kills,
-                    'deaths' => $deaths,
-                    'assists' => $assists,
-                    'acs' => $acs,
-                    'adr' => $adr,
-                    'kast' => $kast,
-                    'hs_percent' => $hsPercent,
-                    'first_bloods' => $firstBloods,
-                    'first_deaths' => $firstDeaths,
-                    'data_source' => 'vlr'
-                ];
+                if (!empty($playerName) && $playerName !== 'Player') {
+                    $details['players'][] = [
+                        'name' => $playerName,
+                        'team' => $teamName,
+                        'agent' => $agent,
+                        'kills' => $kills,
+                        'deaths' => $deaths,
+                        'assists' => $assists,
+                        'acs' => $acs,
+                        'adr' => $adr,
+                        'kast' => $kast,
+                        'hs_percent' => $hsPercent,
+                        'first_bloods' => $firstBloods,
+                        'first_deaths' => $firstDeaths,
+                        'data_source' => 'vlr'
+                    ];
+                }
             } catch (Exception $e) {
                 // Skip malformed row
             }
