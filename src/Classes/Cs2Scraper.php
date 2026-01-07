@@ -72,19 +72,17 @@ class Cs2Scraper extends LiquipediaScraper
 
 
 
+    /**
+     * Extrae stats de jugadores - ahora soporta extracción por mapa
+     */
     protected function extractPlayerStats(Crawler $crawler): array
     {
         $rawPlayers = [];
 
         $crawler->filter('table.wikitable')->each(function (Crawler $table) use (&$rawPlayers) {
-            $headers = $table->filter('th')->each(function ($th) {
-                return trim($th->text());
-            });
+            $headers = $table->filter('th')->each(fn($th) => trim($th->text()));
 
-            $isStatsTable = false;
-            $kIndex = -1;
-            $dIndex = -1;
-            $aIndex = -1;
+            $kIndex = $dIndex = $aIndex = -1;
             $nameIndex = 0;
 
             foreach ($headers as $i => $h) {
@@ -100,27 +98,23 @@ class Cs2Scraper extends LiquipediaScraper
             }
 
             if ($kIndex !== -1 && $dIndex !== -1) {
-                $isStatsTable = true;
-            }
-
-            if ($isStatsTable) {
                 $table->filter('tr')->each(function ($tr) use (&$rawPlayers, $kIndex, $dIndex, $aIndex, $nameIndex) {
                     $tds = $tr->filter('td');
-                    if ($tds->count() > max($kIndex, $dIndex, $aIndex)) {
+                    if ($tds->count() > max($kIndex, $dIndex)) {
                         $nameNode = $tds->eq($nameIndex);
-                        $player = trim($nameNode->text());
+                        $player = $nameNode->filter('a')->count()
+                            ? trim($nameNode->filter('a')->text())
+                            : trim($nameNode->text());
 
-                        if (!empty($player)) {
-                            $k = (int) trim($tds->eq($kIndex)->text());
-                            $d = (int) trim($tds->eq($dIndex)->text());
-                            $a = $aIndex !== -1 ? (int) trim($tds->eq($aIndex)->text()) : 0;
-
+                        if (!empty($player) && $player !== 'Player') {
                             $rawPlayers[] = [
                                 'name' => $player,
-                                'kills' => $k,
-                                'deaths' => $d,
-                                'assists' => $a,
-                                'agent' => ''
+                                'kills' => (int) trim($tds->eq($kIndex)->text()),
+                                'deaths' => (int) trim($tds->eq($dIndex)->text()),
+                                'assists' => $aIndex !== -1 ? (int) trim($tds->eq($aIndex)->text()) : 0,
+                                'agent' => '',
+                                'team' => 'Unknown',
+                                'data_source' => 'liquipedia'
                             ];
                         }
                     }
@@ -128,43 +122,88 @@ class Cs2Scraper extends LiquipediaScraper
             }
         });
 
-        // Aggregate players
-        $aggregated = [];
-        foreach ($rawPlayers as $p) {
-            $name = $p['name'];
-            if (!isset($aggregated[$name])) {
-                $aggregated[$name] = [
-                    'name' => $name,
-                    'kills' => 0,
-                    'deaths' => 0,
-                    'assists' => 0,
-                    'agents' => [] // No agents in CS2
-                ];
+        return $rawPlayers;
+    }
+
+    /**
+     * Extrae stats por mapa desde múltiples tablas
+     */
+    protected function extractPlayerStatsByMap(Crawler $crawler): array
+    {
+        $playersByMap = [];
+        $tables = $crawler->filter('table.wikitable');
+
+        if ($tables->count() <= 1) {
+            return $playersByMap;
+        }
+
+        // Buscar headers de mapa antes de cada tabla
+        $mapNames = [];
+        $crawler->filter('.mw-headline, .match-bm-game-header, h3, h4')->each(function (Crawler $header) use (&$mapNames) {
+            $text = trim($header->text());
+            // Detectar nombres de mapa comunes de CS2
+            if (preg_match('/(Mirage|Inferno|Dust2|Nuke|Ancient|Anubis|Overpass|Vertigo|Train)/i', $text, $matches)) {
+                $mapNames[] = $matches[1];
             }
-            $aggregated[$name]['kills'] += $p['kills'];
-            $aggregated[$name]['deaths'] += $p['deaths'];
-            $aggregated[$name]['assists'] += $p['assists'];
-        }
+        });
 
-        // Format for output
-        $finalPlayers = [];
-        foreach ($aggregated as $p) {
-            $finalPlayers[] = [
-                'name' => $p['name'],
-                'kills' => $p['kills'],
-                'deaths' => $p['deaths'],
-                'assists' => $p['assists'],
-                'agent' => '',
-                'team' => 'Unknown'
-            ];
-        }
+        $tables->each(function (Crawler $table, $index) use (&$playersByMap, $mapNames) {
+            if ($index === 0)
+                return; // Skip first table (usually overall)
 
-        return $finalPlayers;
+            $mapName = $mapNames[$index - 1] ?? "Map " . $index;
+            $players = [];
+
+            $headers = $table->filter('th')->each(fn($th) => trim($th->text()));
+            $kIndex = $dIndex = $aIndex = -1;
+            $nameIndex = 0;
+
+            foreach ($headers as $i => $h) {
+                $h = strtolower($h);
+                if ($h === 'k' || $h === 'kills')
+                    $kIndex = $i;
+                if ($h === 'd' || $h === 'deaths')
+                    $dIndex = $i;
+                if ($h === 'a' || $h === 'assists')
+                    $aIndex = $i;
+                if ($h === 'player')
+                    $nameIndex = $i;
+            }
+
+            if ($kIndex !== -1 && $dIndex !== -1) {
+                $table->filter('tr')->each(function ($tr) use (&$players, $kIndex, $dIndex, $aIndex, $nameIndex) {
+                    $tds = $tr->filter('td');
+                    if ($tds->count() > max($kIndex, $dIndex)) {
+                        $nameNode = $tds->eq($nameIndex);
+                        $player = $nameNode->filter('a')->count()
+                            ? trim($nameNode->filter('a')->text())
+                            : trim($nameNode->text());
+
+                        if (!empty($player) && $player !== 'Player') {
+                            $players[] = [
+                                'name' => $player,
+                                'kills' => (int) trim($tds->eq($kIndex)->text()),
+                                'deaths' => (int) trim($tds->eq($dIndex)->text()),
+                                'assists' => $aIndex !== -1 ? (int) trim($tds->eq($aIndex)->text()) : 0,
+                                'agent' => '',
+                                'team' => 'Unknown',
+                                'data_source' => 'liquipedia'
+                            ];
+                        }
+                    }
+                });
+            }
+
+            if (!empty($players)) {
+                $playersByMap[$mapName] = $players;
+            }
+        });
+
+        return $playersByMap;
     }
 
     public function scrapeMatchDetails(string $url): array
     {
-        // Remove domain if present to get relative path for fetch
         $path = parse_url($url, PHP_URL_PATH);
         $html = $this->fetch($path);
 
@@ -176,10 +215,11 @@ class Cs2Scraper extends LiquipediaScraper
         $details = [
             'maps' => [],
             'streams' => [],
-            'players' => []
+            'players' => [],
+            'players_by_map' => []
         ];
 
-        // Maps extraction (Improved)
+        // Maps extraction
         $crawler->filter('div.mapname')->each(function (Crawler $node) use (&$details) {
             $mapName = trim($node->text());
             $parent = $node->closest('div');
@@ -196,7 +236,7 @@ class Cs2Scraper extends LiquipediaScraper
             }
         });
 
-        // Fallback for maps if mapname class not found
+        // Fallback for maps
         if (empty($details['maps'])) {
             $crawler->filter('div.match-history-game')->each(function (Crawler $node) use (&$details) {
                 $mapNode = $node->filter('.match-history-map');
@@ -215,9 +255,13 @@ class Cs2Scraper extends LiquipediaScraper
             });
         }
 
-        // Extract Players
+        // Extract overall stats
         $details['players'] = $this->extractPlayerStats($crawler);
+
+        // Extract per-map stats
+        $details['players_by_map'] = $this->extractPlayerStatsByMap($crawler);
 
         return $details;
     }
 }
+

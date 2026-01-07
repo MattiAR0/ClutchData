@@ -36,9 +36,9 @@
     }
 
     // Background Sync - fires after page loads, doesn't block rendering
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // Small delay to prioritize UI rendering
-        setTimeout(function() {
+        setTimeout(function () {
             const indicator = document.getElementById('sync-indicator');
             const status = document.getElementById('sync-status');
 
@@ -47,21 +47,37 @@
             indicator.classList.add('bg-yellow-500', 'animate-pulse');
             status.textContent = 'Syncing...';
 
-            fetch('../api_sync.php')
+            fetch('./api/auto-update')
                 .then(response => response.json())
                 .then(data => {
                     indicator.classList.remove('bg-yellow-500', 'animate-pulse');
 
                     if (data.success) {
                         indicator.classList.add('bg-green-500');
-                        if (data.synced > 0) {
-                            status.textContent = `+${data.synced} new matches`;
-                            // Reload page to show new data after 2 seconds
-                            setTimeout(() => location.reload(), 2000);
-                        } else if (data.skipped) {
-                            status.textContent = 'Data Fresh';
+
+                        if (data.updated) {
+                            // Calculate total new matches
+                            let totalNew = 0;
+                            if (data.results) {
+                                for (const game in data.results) {
+                                    totalNew += data.results[game].new || 0;
+                                }
+                            }
+
+                            if (totalNew > 0 || data.matches_with_maps_updated > 0) {
+                                let msg = [];
+                                if (totalNew > 0) msg.push(`+${totalNew} matches`);
+                                if (data.matches_with_maps_updated > 0) msg.push(`+${data.matches_with_maps_updated} maps`);
+                                status.textContent = msg.join(', ');
+                                // Reload page to show new data after 2 seconds
+                                setTimeout(() => location.reload(), 2000);
+                            } else {
+                                status.textContent = 'Up to Date';
+                            }
+                        } else if (data.next_update_in) {
+                            status.textContent = `Next sync: ${Math.ceil(data.next_update_in / 60)}m`;
                         } else {
-                            status.textContent = 'Up to Date';
+                            status.textContent = 'Data Fresh';
                         }
                     } else {
                         indicator.classList.add('bg-red-500');

@@ -80,34 +80,42 @@ class ValorantScraper extends LiquipediaScraper
 
 
 
-    protected function extractPlayerStats(Crawler $crawler): array
+    /**
+     * Extrae stats de jugadores - ahora soporta extracción por mapa
+     * @param Crawler $crawler Full page crawler
+     * @param string|null $mapContext Si se especifica, extrae solo de ese mapa
+     * @return array Stats de jugadores
+     */
+    protected function extractPlayerStats(Crawler $crawler, ?string $mapContext = null): array
     {
         $rawPlayers = [];
 
-        // 1. Try new div-based structure (Modern Liquipedia Valorant Match Pages)
-        // We prioritize this as it is cleaner when available.
-        // Scope to the FIRST wrapper to avoid double counting (Matches often have Total + Map 1 + Map 2 duplicates)
-        $wrapper = $crawler->filter('.match-bm-players-wrapper')->first();
+        // Determinar qué wrapper usar
+        $wrapperSelector = '.match-bm-players-wrapper';
+        $wrappers = $crawler->filter($wrapperSelector);
 
-        if ($wrapper->count() > 0) {
-            // Updated logic: Iterate over teams first to get team context
-            $wrapper->filter('.match-bm-players-team')->each(function (Crawler $teamNode) use (&$rawPlayers) {
-                // Extract Team Name
+        if ($wrappers->count() === 0) {
+            // Fallback a tablas
+            return $this->extractPlayerStatsFromTables($crawler);
+        }
+
+        // Si se especifica mapa, intentar encontrar el wrapper correcto
+        // Los mapas suelen estar ordenados: [Overall, Map1, Map2, ...]
+        $targetWrapper = $mapContext === null ? $wrappers->first() : $wrappers->first();
+
+        if ($targetWrapper->count() > 0) {
+            $targetWrapper->filter('.match-bm-players-team')->each(function (Crawler $teamNode) use (&$rawPlayers) {
                 $teamName = 'Unknown Team';
                 $header = $teamNode->filter('.match-bm-players-team-header');
                 if ($header->count()) {
-                    // Try text first
                     $text = trim($header->text());
                     if (!empty($text)) {
                         $teamName = $text;
                     } else {
-                        // Try image alt or title
-                        $img = $header->filter('img')->last(); // Last image often contains the logo if multiple
+                        $img = $header->filter('img')->last();
                         if ($img->count()) {
                             $teamName = $img->attr('alt') ?? $img->attr('title') ?? 'Unknown Team';
                         }
-
-                        // Fallback to link title
                         if ($teamName === 'Unknown Team') {
                             $link = $header->filter('a')->first();
                             if ($link->count()) {
@@ -119,24 +127,17 @@ class ValorantScraper extends LiquipediaScraper
 
                 $teamNode->filter('div.match-bm-players-player')->each(function (Crawler $row) use (&$rawPlayers, $teamName) {
                     $nameNode = $row->filter('.match-bm-players-player-name');
-                    // Prefer name from link to avoid extra text
-                    if ($nameNode->filter('a')->count()) {
-                        $player = trim($nameNode->filter('a')->text());
-                    } else {
-                        $player = $nameNode->count() ? trim($nameNode->text()) : 'Unknown';
-                    }
+                    $player = $nameNode->filter('a')->count()
+                        ? trim($nameNode->filter('a')->text())
+                        : ($nameNode->count() ? trim($nameNode->text()) : 'Unknown');
 
-                    // Collect Agents
                     $agent = '';
                     $agentImg = $nameNode->filter('img')->last();
                     if ($agentImg->count()) {
                         $agent = $agentImg->attr('alt') ?? $agentImg->attr('title') ?? '';
                     }
 
-                    $k = 0;
-                    $d = 0;
-                    $a = 0;
-
+                    $k = $d = $a = 0;
                     $row->filter('.match-bm-players-player-stat')->each(function (Crawler $stat) use (&$k, &$d, &$a) {
                         $titleNode = $stat->filter('.match-bm-players-player-stat-title');
                         $title = $titleNode->count() ? trim($titleNode->text()) : '';
@@ -160,120 +161,192 @@ class ValorantScraper extends LiquipediaScraper
                             'deaths' => $d,
                             'assists' => $a,
                             'agent' => $agent,
-                            'team' => $teamName
+                            'team' => $teamName,
+                            'data_source' => 'liquipedia'
                         ];
                     }
                 });
             });
         }
 
-        // 2. If Divs returned nothing, Fallback to standard wikitable
-        if (empty($rawPlayers)) {
-            $crawler->filter('table.wikitable, table.vm-stats-game-table')->each(function (Crawler $table) use (&$rawPlayers) {
-                $headers = $table->filter('th')->each(function ($th) {
-                    return trim($th->text());
-                });
+        return $rawPlayers;
+    }
 
-                $kIndex = -1;
-                $dIndex = -1;
-                $aIndex = -1;
-                $agentIndex = -1;
-                $nameIndex = 0;
+    /**
+     * Extrae stats por cada mapa desde los wrappers
+     * @return array ['mapName' => [players...], ...]
+     */
+    protected function extractPlayerStatsByMap(Crawler $crawler): array
+    {
+        $playersByMap = [];
+        $wrappers = $crawler->filter('.match-bm-players-wrapper');
 
-                foreach ($headers as $i => $h) {
-                    $h = strtolower($h);
-                    if ($h === 'k')
-                        $kIndex = $i;
-                    if ($h === 'd')
-                        $dIndex = $i;
-                    if ($h === 'a')
-                        $aIndex = $i;
-                    if ($h === 'agent')
-                        $agentIndex = $i;
-                    if ($h === 'player')
-                        $nameIndex = $i;
-                }
+        if ($wrappers->count() <= 1) {
+            return $playersByMap; // Solo hay overall, no hay por mapa
+        }
 
-                if ($kIndex !== -1 && $dIndex !== -1 && $aIndex !== -1) {
-                    $table->filter('tr')->each(function ($tr) use (&$rawPlayers, $kIndex, $dIndex, $aIndex, $nameIndex, $agentIndex) {
-                        $tds = $tr->filter('td');
-                        if ($tds->count() > max($kIndex, $dIndex, $aIndex)) {
-                            $nameNode = $tds->eq($nameIndex);
-                            // Prefer link text
-                            if ($nameNode->filter('a')->count()) {
-                                $player = trim($nameNode->filter('a')->text());
-                            } else {
-                                $player = trim($nameNode->text());
-                            }
+        // Obtener nombres de mapas de las tabs
+        $mapNames = [];
+        $crawler->filter('.match-bm-lol-stats-game-nav-item, .match-bm-game-nav-item')->each(function (Crawler $tab, $i) use (&$mapNames) {
+            $mapName = trim($tab->text());
+            if (!empty($mapName) && strtolower($mapName) !== 'overall' && strtolower($mapName) !== 'all') {
+                $mapNames[] = $mapName;
+            }
+        });
 
-                            if (!empty($player)) {
-                                $agent = '';
-                                if ($agentIndex !== -1 && $tds->eq($agentIndex)->count()) {
-                                    $agentNode = $tds->eq($agentIndex);
-                                    $img = $agentNode->filter('img');
-                                    if ($img->count()) {
-                                        $agent = $img->attr('alt') ?? $img->attr('title') ?? '';
-                                    } else {
-                                        $agent = trim($agentNode->text());
-                                    }
-                                }
-
-                                $rawPlayers[] = [
-                                    'name' => $player,
-                                    'kills' => (int) trim($tds->eq($kIndex)->text()),
-                                    'deaths' => (int) trim($tds->eq($dIndex)->text()),
-                                    'assists' => (int) trim($tds->eq($aIndex)->text()),
-                                    'agent' => $agent
-                                ];
-                            }
-                        }
-                    });
+        // Si no encontramos tabs, intentar con headers de mapa
+        if (empty($mapNames)) {
+            $crawler->filter('.match-bm-lol-stats-header, .match-bm-game-header')->each(function (Crawler $header) use (&$mapNames) {
+                $text = trim($header->text());
+                if (!empty($text) && !str_contains(strtolower($text), 'total')) {
+                    $mapNames[] = preg_replace('/\s*\d+-\d+\s*$/', '', $text); // Remove score
                 }
             });
         }
 
-        // Aggregate players
-        $aggregated = [];
-        foreach ($rawPlayers as $p) {
-            $name = $p['name'];
-            if (!isset($aggregated[$name])) {
-                $aggregated[$name] = [
-                    'name' => $name,
-                    'kills' => 0,
-                    'deaths' => 0,
-                    'assists' => 0,
-                    'agents' => [],
-                    'team' => $p['team'] ?? 'Unknown'
-                ];
+        // Iterar wrappers (skip first if it's overall)
+        $wrappers->each(function (Crawler $wrapper, $index) use (&$playersByMap, $mapNames) {
+            // Determinar nombre del mapa
+            $mapName = $mapNames[$index] ?? "Map " . ($index + 1);
+
+            // Skip if this looks like an overall/total wrapper
+            if ($index === 0 && str_contains(strtolower($mapName), 'overall')) {
+                return;
             }
-            $aggregated[$name]['kills'] += $p['kills'];
-            $aggregated[$name]['deaths'] += $p['deaths'];
-            $aggregated[$name]['assists'] += $p['assists'];
 
-            if (!empty($p['agent']) && !in_array($p['agent'], $aggregated[$name]['agents'])) {
-                $aggregated[$name]['agents'][] = $p['agent'];
+            $players = [];
+            $wrapper->filter('.match-bm-players-team')->each(function (Crawler $teamNode) use (&$players) {
+                $teamName = 'Unknown Team';
+                $header = $teamNode->filter('.match-bm-players-team-header');
+                if ($header->count()) {
+                    $text = trim($header->text());
+                    if (!empty($text)) {
+                        $teamName = $text;
+                    } else {
+                        $link = $header->filter('a')->first();
+                        if ($link->count()) {
+                            $teamName = $link->attr('title') ?? 'Unknown Team';
+                        }
+                    }
+                }
+
+                $teamNode->filter('div.match-bm-players-player')->each(function (Crawler $row) use (&$players, $teamName) {
+                    $nameNode = $row->filter('.match-bm-players-player-name');
+                    $player = $nameNode->filter('a')->count()
+                        ? trim($nameNode->filter('a')->text())
+                        : ($nameNode->count() ? trim($nameNode->text()) : 'Unknown');
+
+                    $agent = '';
+                    $agentImg = $nameNode->filter('img')->last();
+                    if ($agentImg->count()) {
+                        $agent = $agentImg->attr('alt') ?? $agentImg->attr('title') ?? '';
+                    }
+
+                    $k = $d = $a = 0;
+                    $row->filter('.match-bm-players-player-stat')->each(function (Crawler $stat) use (&$k, &$d, &$a) {
+                        $titleNode = $stat->filter('.match-bm-players-player-stat-title');
+                        $title = $titleNode->count() ? trim($titleNode->text()) : '';
+
+                        if (str_contains($title, 'KDA')) {
+                            $dataNode = $stat->filter('.match-bm-players-player-stat-data');
+                            $data = $dataNode->count() ? trim($dataNode->text()) : '';
+                            $parts = explode('/', $data);
+                            if (count($parts) >= 3) {
+                                $k = (int) trim($parts[0]);
+                                $d = (int) trim($parts[1]);
+                                $a = (int) trim($parts[2]);
+                            }
+                        }
+                    });
+
+                    if ($player !== 'Unknown' && ($k > 0 || $d > 0 || $a > 0)) {
+                        $players[] = [
+                            'name' => $player,
+                            'kills' => $k,
+                            'deaths' => $d,
+                            'assists' => $a,
+                            'agent' => $agent,
+                            'team' => $teamName,
+                            'data_source' => 'liquipedia'
+                        ];
+                    }
+                });
+            });
+
+            if (!empty($players)) {
+                $playersByMap[$mapName] = $players;
             }
-        }
+        });
 
-        // Format for output
-        $finalPlayers = [];
-        foreach ($aggregated as $p) {
-            $finalPlayers[] = [
-                'name' => $p['name'],
-                'kills' => $p['kills'],
-                'deaths' => $p['deaths'],
-                'assists' => $p['assists'],
-                'agent' => implode(', ', $p['agents']),
-                'team' => $p['team']
-            ];
-        }
+        return $playersByMap;
+    }
 
-        return $finalPlayers;
+    /**
+     * Fallback: extrae stats desde tablas wikitable
+     */
+    protected function extractPlayerStatsFromTables(Crawler $crawler): array
+    {
+        $rawPlayers = [];
+
+        $crawler->filter('table.wikitable, table.vm-stats-game-table')->each(function (Crawler $table) use (&$rawPlayers) {
+            $headers = $table->filter('th')->each(fn($th) => trim($th->text()));
+
+            $kIndex = $dIndex = $aIndex = $agentIndex = -1;
+            $nameIndex = 0;
+
+            foreach ($headers as $i => $h) {
+                $h = strtolower($h);
+                if ($h === 'k')
+                    $kIndex = $i;
+                if ($h === 'd')
+                    $dIndex = $i;
+                if ($h === 'a')
+                    $aIndex = $i;
+                if ($h === 'agent')
+                    $agentIndex = $i;
+                if ($h === 'player')
+                    $nameIndex = $i;
+            }
+
+            if ($kIndex !== -1 && $dIndex !== -1 && $aIndex !== -1) {
+                $table->filter('tr')->each(function ($tr) use (&$rawPlayers, $kIndex, $dIndex, $aIndex, $nameIndex, $agentIndex) {
+                    $tds = $tr->filter('td');
+                    if ($tds->count() > max($kIndex, $dIndex, $aIndex)) {
+                        $nameNode = $tds->eq($nameIndex);
+                        $player = $nameNode->filter('a')->count()
+                            ? trim($nameNode->filter('a')->text())
+                            : trim($nameNode->text());
+
+                        if (!empty($player)) {
+                            $agent = '';
+                            if ($agentIndex !== -1 && $tds->eq($agentIndex)->count()) {
+                                $agentNode = $tds->eq($agentIndex);
+                                $img = $agentNode->filter('img');
+                                $agent = $img->count()
+                                    ? ($img->attr('alt') ?? $img->attr('title') ?? '')
+                                    : trim($agentNode->text());
+                            }
+
+                            $rawPlayers[] = [
+                                'name' => $player,
+                                'kills' => (int) trim($tds->eq($kIndex)->text()),
+                                'deaths' => (int) trim($tds->eq($dIndex)->text()),
+                                'assists' => (int) trim($tds->eq($aIndex)->text()),
+                                'agent' => $agent,
+                                'team' => 'Unknown',
+                                'data_source' => 'liquipedia'
+                            ];
+                        }
+                    }
+                });
+            }
+        });
+
+        return $rawPlayers;
     }
 
     public function scrapeMatchDetails(string $url): array
     {
-        // Parse path
         $path = parse_url($url, PHP_URL_PATH);
         $html = $this->fetch($path);
 
@@ -285,13 +358,15 @@ class ValorantScraper extends LiquipediaScraper
         $details = [
             'maps' => [],
             'streams' => [],
-            'players' => []
+            'players' => [],
+            'players_by_map' => []
         ];
 
         // Valorant map scores
         $crawler->filter('div.vm-stats-game')->each(function (Crawler $node) use (&$details) {
             $mapHeader = $node->filter('.vm-stats-game-header');
             $mapName = $mapHeader->count() ? trim($mapHeader->text()) : 'Unknown Map';
+            $mapName = preg_replace('/\s*\d+-\d+\s*$/', '', $mapName); // Remove score from name
 
             $scoreNode = $node->filter('.vm-stats-game-header-score');
             $score = $scoreNode->count() ? trim($scoreNode->text()) : '';
@@ -306,11 +381,11 @@ class ValorantScraper extends LiquipediaScraper
             }
         });
 
+        // Fallback for maps
         if (empty($details['maps'])) {
             $crawler->filter('div.match-history-game')->each(function (Crawler $node) use (&$details) {
                 $mapNode = $node->filter('.match-history-map');
                 $mapName = $mapNode->count() ? trim($mapNode->text()) : 'Unknown';
-
                 $scoreNode = $node->filter('.match-history-score');
                 $score = $scoreNode->count() ? $scoreNode->text() : '';
 
@@ -325,7 +400,11 @@ class ValorantScraper extends LiquipediaScraper
             });
         }
 
+        // Extract overall player stats
         $details['players'] = $this->extractPlayerStats($crawler);
+
+        // Extract per-map stats
+        $details['players_by_map'] = $this->extractPlayerStatsByMap($crawler);
 
         return $details;
     }

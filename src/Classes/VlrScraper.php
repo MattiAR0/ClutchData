@@ -302,8 +302,20 @@ class VlrScraper implements ScraperInterface
                         $playerLink = $playerCell->filter('a');
                         $playerName = $playerLink->count() ? trim($playerLink->text()) : trim($playerCell->text());
 
+                        // Try multiple selectors for agent image
+                        $agent = '';
                         $agentImg = $playerCell->filter('img.mod-agent');
-                        $agent = $agentImg->count() ? ($agentImg->attr('alt') ?? $agentImg->attr('title') ?? '') : '';
+                        if (!$agentImg->count()) {
+                            $agentImg = $playerCell->filter('img'); // Any image in player cell
+                        }
+                        if (!$agentImg->count() && $cells->count() > 1) {
+                            $agentImg = $cells->eq(1)->filter('img'); // Check second cell
+                        }
+                        if ($agentImg->count()) {
+                            $agent = $agentImg->attr('alt') ?? $agentImg->attr('title') ?? '';
+                            // Clean agent name
+                            $agent = preg_replace('/\s*(icon|logo|image).*$/i', '', $agent);
+                        }
 
                         $stats = $cells->each(fn($td) => trim($td->text()));
 
@@ -360,8 +372,19 @@ class VlrScraper implements ScraperInterface
                 $playerLink = $playerCell->filter('a');
                 $playerName = $playerLink->count() ? trim($playerLink->text()) : trim($playerCell->text());
 
+                // Try multiple selectors for agent image
+                $agent = '';
                 $agentImg = $playerCell->filter('img.mod-agent');
-                $agent = $agentImg->count() ? ($agentImg->attr('alt') ?? $agentImg->attr('title') ?? '') : '';
+                if (!$agentImg->count()) {
+                    $agentImg = $playerCell->filter('img');
+                }
+                if (!$agentImg->count() && $cells->count() > 1) {
+                    $agentImg = $cells->eq(1)->filter('img');
+                }
+                if ($agentImg->count()) {
+                    $agent = $agentImg->attr('alt') ?? $agentImg->attr('title') ?? '';
+                    $agent = preg_replace('/\s*(icon|logo|image).*$/i', '', $agent);
+                }
 
                 $stats = $cells->each(fn($td) => trim($td->text()));
 

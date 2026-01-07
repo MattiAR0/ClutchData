@@ -266,6 +266,18 @@ class PlayerStatsModel
     }
 
     /**
+     * Verifica si un partido tiene cualquier tipo de stats
+     */
+    public function hasStats(int $matchId): bool
+    {
+        $sql = "SELECT COUNT(*) FROM player_stats WHERE match_id = :match_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':match_id' => $matchId]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /**
      * Verifica si un partido tiene stats de VLR.gg
      */
     public function hasVlrStats(int $matchId): bool

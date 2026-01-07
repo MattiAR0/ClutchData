@@ -59,6 +59,7 @@ $router->get('/api/match/stats', [ApiController::class, 'getMatchStats']);
 $router->get('/api/teams', [ApiController::class, 'getTeams']);
 $router->get('/api/team', [ApiController::class, 'getTeam']);
 $router->get('/api/stats', [ApiController::class, 'getStats']);
+$router->get('/api/auto-update', [ApiController::class, 'autoUpdate']);
 
 // Resolver Ruta Actual
 $router->resolve();

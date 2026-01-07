@@ -434,8 +434,8 @@
                 </div>
             <?php endif; ?>
 
-            <!-- Async Loading Placeholder for Stats (when not cached) -->
-            <?php if (!empty($match['needs_async_stats'])): ?>
+            <!-- Async Loading Placeholder for Stats (only if no cached stats exist) -->
+            <?php if (!empty($match['needs_async_stats']) && !$hasStats): ?>
                 <div id="async-stats-container" class="mb-16">
                     <div class="flex items-center gap-4 mb-8">
                         <div class="h-px bg-zinc-800 flex-grow"></div>

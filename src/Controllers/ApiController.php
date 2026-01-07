@@ -311,51 +311,82 @@ class ApiController
             $cached = false;
             $source = null;
 
-            // Valorant: usar VLR.gg
+            // Valorant: primero cache, luego Liquipedia (rápido), luego VLR (enriquecido)
             if ($match['game_type'] === 'valorant' && $match['match_status'] === 'completed') {
-                // Verificar si ya tenemos stats cacheadas
+                // 1. Verificar si ya tenemos stats cacheadas de VLR (prioritaria)
                 if ($playerStatsModel->hasVlrStats($match['id'])) {
                     $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
                     $cached = true;
                     $source = 'vlr';
-                } else {
-                    // Scraping asíncrono
-                    try {
-                        $vlrScraper = new VlrScraper();
-                        $vlrMatchId = $match['vlr_match_id'];
-
-                        // Buscar por nombres de equipo si no tenemos vlr_match_id
-                        if (empty($vlrMatchId)) {
-                            $vlrMatchId = $vlrScraper->findMatchByTeams(
-                                $match['team1_name'],
-                                $match['team2_name'],
-                                $match['match_time']
-                            );
-                            if ($vlrMatchId) {
-                                $this->matchModel->updateVlrMatchId($match['id'], $vlrMatchId);
+                }
+                // 2. Verificar si tenemos stats de Liquipedia
+                elseif ($playerStatsModel->hasStats($match['id'])) {
+                    $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                    $cached = true;
+                    $source = 'liquipedia';
+                    // Indicar que se puede enriquecer con VLR más tarde
+                    $canEnrich = true;
+                }
+                // 3. Si no hay cache, intentar Liquipedia primero (más rápido)
+                else {
+                    // Primero intentar obtener de match_details guardados
+                    if (!empty($match['match_details'])) {
+                        $details = json_decode($match['match_details'], true);
+                        if (!empty($details['players'])) {
+                            foreach ($details['players'] as $player) {
+                                $player['data_source'] = 'liquipedia';
                             }
-                        }
+                            $playerStatsModel->saveStats($match['id'], $details['players'], 'overall');
 
-                        if ($vlrMatchId) {
-                            $vlrDetails = $vlrScraper->scrapeMatchDetails($vlrMatchId);
-
-                            // Guardar stats overall
-                            if (!empty($vlrDetails['players'])) {
-                                $playerStatsModel->saveStats($match['id'], $vlrDetails['players'], 'overall');
-                            }
-
-                            // Guardar stats por mapa
-                            if (!empty($vlrDetails['players_by_map'])) {
-                                foreach ($vlrDetails['players_by_map'] as $mapName => $mapPlayers) {
+                            // Guardar stats por mapa si existen
+                            if (!empty($details['players_by_map'])) {
+                                foreach ($details['players_by_map'] as $mapName => $mapPlayers) {
                                     $playerStatsModel->saveStats($match['id'], $mapPlayers, $mapName);
                                 }
                             }
 
                             $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
-                            $source = 'vlr';
+                            $source = 'liquipedia';
+                            $canEnrich = true;
                         }
-                    } catch (Exception $e) {
-                        $this->logger->warning("VLR scraping failed", ['error' => $e->getMessage()]);
+                    }
+
+                    // 4. Si aún no hay stats, intentar VLR (puede ser más lento)
+                    if (empty($stats)) {
+                        try {
+                            $vlrScraper = new VlrScraper();
+                            $vlrMatchId = $match['vlr_match_id'];
+
+                            if (empty($vlrMatchId)) {
+                                $vlrMatchId = $vlrScraper->findMatchByTeams(
+                                    $match['team1_name'],
+                                    $match['team2_name'],
+                                    $match['match_time']
+                                );
+                                if ($vlrMatchId) {
+                                    $this->matchModel->updateVlrMatchId($match['id'], $vlrMatchId);
+                                }
+                            }
+
+                            if ($vlrMatchId) {
+                                $vlrDetails = $vlrScraper->scrapeMatchDetails($vlrMatchId);
+
+                                if (!empty($vlrDetails['players'])) {
+                                    $playerStatsModel->saveStats($match['id'], $vlrDetails['players'], 'overall');
+                                }
+
+                                if (!empty($vlrDetails['players_by_map'])) {
+                                    foreach ($vlrDetails['players_by_map'] as $mapName => $mapPlayers) {
+                                        $playerStatsModel->saveStats($match['id'], $mapPlayers, $mapName);
+                                    }
+                                }
+
+                                $stats = $playerStatsModel->getStatsByMatchGrouped($match['id']);
+                                $source = 'vlr';
+                            }
+                        } catch (Exception $e) {
+                            $this->logger->warning("VLR scraping failed", ['error' => $e->getMessage()]);
+                        }
                     }
                 }
             }
@@ -436,6 +467,113 @@ class ApiController
         } catch (Exception $e) {
             $this->logger->error("API getMatchStats error", ['error' => $e->getMessage()]);
             $this->errorResponse('Error retrieving match stats: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/auto-update
+     * Triggers background update of matches and stats.
+     * Rate limited: only runs once every 5 minutes.
+     * Called automatically when user visits the home page.
+     */
+    public function autoUpdate(): void
+    {
+        try {
+            $lockFile = __DIR__ . '/../../logs/last_update.lock';
+            $updateInterval = 300; // 5 minutes in seconds
+
+            // Check if we should update
+            $lastUpdate = file_exists($lockFile) ? (int) file_get_contents($lockFile) : 0;
+            $now = time();
+
+            if (($now - $lastUpdate) < $updateInterval) {
+                $this->jsonResponse([
+                    'success' => true,
+                    'updated' => false,
+                    'message' => 'Update skipped (last update was ' . ($now - $lastUpdate) . 's ago)',
+                    'next_update_in' => $updateInterval - ($now - $lastUpdate)
+                ]);
+                return;
+            }
+
+            // Update lock file immediately
+            @file_put_contents($lockFile, (string) $now);
+
+            // Perform lightweight update (only new matches, max 3)
+            $scrapers = [
+                'valorant' => new \App\Classes\ValorantScraper(),
+                'cs2' => new \App\Classes\Cs2Scraper(),
+                'lol' => new \App\Classes\LolScraper()
+            ];
+
+            $results = [];
+            foreach ($scrapers as $game => $scraper) {
+                try {
+                    $matches = $scraper->scrapeMatches();
+                    $saved = 0;
+                    foreach ($matches as $match) {
+                        if ($this->matchModel->saveMatch($match)) {
+                            $saved++;
+                        }
+                    }
+                    $results[$game] = ['found' => count($matches), 'new' => $saved];
+                } catch (Exception $e) {
+                    $results[$game] = ['error' => $e->getMessage()];
+                }
+            }
+
+            // Also update 2 completed matches without per-map data
+            $statsModel = new PlayerStatsModel($this->matchModel->getConnection());
+            $db = $this->matchModel->getConnection();
+
+            $sql = "SELECT DISTINCT m.id, m.game_type, m.match_url
+                    FROM matches m
+                    LEFT JOIN player_stats ps ON m.id = ps.match_id AND ps.map_name != 'overall'
+                    WHERE m.match_status = 'completed'
+                    AND m.match_url IS NOT NULL
+                    AND ps.id IS NULL
+                    ORDER BY m.match_time DESC
+                    LIMIT 2";
+
+            $stmt = $db->query($sql);
+            $matchesToUpdate = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $updatedMaps = 0;
+            foreach ($matchesToUpdate as $match) {
+                $scraper = $scrapers[$match['game_type']] ?? null;
+                if (!$scraper)
+                    continue;
+
+                try {
+                    $details = $scraper->scrapeMatchDetails($match['match_url']);
+                    if (!empty($details['players_by_map'])) {
+                        foreach ($details['players_by_map'] as $mapName => $players) {
+                            foreach ($players as &$player) {
+                                $player['data_source'] = 'liquipedia';
+                            }
+                            $statsModel->saveStats($match['id'], $players, $mapName);
+                        }
+                        $updatedMaps++;
+                    }
+                } catch (Exception $e) {
+                    // Skip failed matches
+                }
+            }
+
+            $this->jsonResponse([
+                'success' => true,
+                'updated' => true,
+                'timestamp' => $now,
+                'results' => $results,
+                'matches_with_maps_updated' => $updatedMaps
+            ]);
+
+        } catch (Exception $e) {
+            $this->logger->error("Auto-update error", ['error' => $e->getMessage()]);
+            $this->jsonResponse([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }
