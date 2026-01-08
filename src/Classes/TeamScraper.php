@@ -660,7 +660,7 @@ class TeamScraper
     /**
      * Scrape list of teams from Liquipedia Category page
      */
-    public function scrapeTeamList(string $gameType): array
+    public function scrapeTeamList(string $gameType, ?string $startFrom = null): array
     {
         $this->applySmartRateLimit();
         $teams = [];
@@ -674,10 +674,14 @@ class TeamScraper
         };
 
         // Build the full URL
-        // Note: For Valorant it's just /valorant/Category:Teams
-        // For others it follows their specific path structure
         $path = $this->gamePaths[$gameType] ?? '/valorant/';
         $url = $path . $categoryName;
+
+        // Apply pagination parameter if provided
+        // Liquipedia uses 'from' for text-based pagination (start from this string)
+        if ($startFrom) {
+            $url .= '?from=' . urlencode($startFrom);
+        }
 
         try {
             $html = $this->fetch($url);

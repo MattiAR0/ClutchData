@@ -116,6 +116,36 @@
     </div>
 </div>
 
+<!-- Search Bar -->
+<div class="mb-6">
+    <form action="" method="GET" class="relative">
+        <?php if (($activeTab ?? 'all') !== 'all'): ?>
+            <input type="hidden" name="game" value="<?= htmlspecialchars($activeTab) ?>">
+        <?php endif; ?>
+        <?php if (($activeRegion ?? 'all') !== 'all'): ?>
+            <input type="hidden" name="region" value="<?= htmlspecialchars($activeRegion) ?>">
+        <?php endif; ?>
+
+        <input type="text" name="q" value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" placeholder="Search teams..."
+            class="w-full bg-zinc-900 border border-zinc-800 text-white px-4 py-3 pl-10 rounded-sm focus:outline-none focus:border-indigo-500 transition-colors placeholder-zinc-600">
+
+        <svg class="w-5 h-5 text-zinc-500 absolute left-3 top-3.5" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+
+        <?php if (!empty($_GET['q'])): ?>
+            <a href="teams<?= ($activeTab ?? 'all') !== 'all' ? '?game=' . $activeTab : '' ?>"
+                class="absolute right-3 top-3.5 text-zinc-500 hover:text-white">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </a>
+        <?php endif; ?>
+    </form>
+</div>
+
 <!-- Status Messages -->
 <?php if (!empty($message)): ?>
     <div class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-sm">
@@ -140,11 +170,21 @@
                 </svg>
             </div>
             <h3 class="text-zinc-300 font-bold uppercase tracking-wide text-sm">No Teams Found</h3>
-            <p class="text-zinc-500 text-xs mt-2 font-mono">Sync matches first to populate teams list.</p>
-            <a href="scrape"
-                class="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-sm hover:bg-indigo-500 transition-colors">
-                SYNC MATCHES
-            </a>
+            <?php if (!empty($_GET['q'])): ?>
+                <p class="text-zinc-500 text-xs mt-2 font-mono">
+                    Results for "<?= htmlspecialchars($_GET['q']) ?>"
+                </p>
+                <a href="https://liquipedia.net/commons/index.php?search=<?= urlencode($_GET['q']) ?>" target="_blank"
+                    class="mt-4 inline-flex items-center px-4 py-2 border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs font-bold rounded-sm transition-colors">
+                    SEARCH ON LIQUIPEDIA
+                </a>
+            <?php else: ?>
+                <p class="text-zinc-500 text-xs mt-2 font-mono">Sync matches first to populate teams list.</p>
+                <a href="scrape"
+                    class="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-sm hover:bg-indigo-500 transition-colors">
+                    SYNC MATCHES
+                </a>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -175,7 +215,8 @@
                         <!-- Logo / Avatar -->
                         <div class="flex items-center gap-4 mb-4">
                             <?php if (!empty($team['logo_url'])): ?>
-                                <img src="<?= htmlspecialchars($team['logo_url']) ?>" alt="<?= htmlspecialchars($team['name']) ?>"
+                                <img src="image-proxy?url=<?= urlencode($team['logo_url']) ?>"
+                                    alt="<?= htmlspecialchars($team['name']) ?>"
                                     class="w-12 h-12 object-contain rounded bg-zinc-800 p-1">
                             <?php else: ?>
                                 <div class="w-12 h-12 rounded bg-zinc-800 flex items-center justify-center text-zinc-600">
@@ -215,6 +256,84 @@
                 </a>
             <?php endforeach; ?>
         </div>
+
+        <!-- Pagination Controls -->
+        <?php if ($totalPages > 1): ?>
+            <div class="mt-12 flex items-center justify-between border-t border-zinc-800 pt-6">
+                <!-- Mobile: Simple Prev/Next -->
+                <div class="flex flex-1 justify-between sm:hidden">
+                    <?php if ($page > 1): ?>
+                        <a href="?page=<?= $page - 1 ?><?= ($activeTab !== 'all' ? '&game=' . $activeTab : '') . ($activeRegion !== 'all' ? '&region=' . $activeRegion : '') . (!empty($_GET['q']) ? '&q=' . urlencode($_GET['q']) : '') ?>"
+                            class="relative inline-flex items-center rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700">
+                            Previous
+                        </a>
+                    <?php else: ?>
+                        <span
+                            class="relative inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-600 cursor-not-allowed">
+                            Previous
+                        </span>
+                    <?php endif; ?>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a href="?page=<?= $page + 1 ?><?= ($activeTab !== 'all' ? '&game=' . $activeTab : '') . ($activeRegion !== 'all' ? '&region=' . $activeRegion : '') . (!empty($_GET['q']) ? '&q=' . urlencode($_GET['q']) : '') ?>"
+                            class="relative ml-3 inline-flex items-center rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700">
+                            Next
+                        </a>
+                    <?php else: ?>
+                        <span
+                            class="relative ml-3 inline-flex items-center rounded-md border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-600 cursor-not-allowed">
+                            Next
+                        </span>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Desktop: Full Pagination -->
+                <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-zinc-500 font-mono">
+                            Showing <span class="font-medium"><?= ($page - 1) * $limit + 1 ?></span> to <span
+                                class="font-medium"><?= min($page * $limit, $totalTeams) ?></span> of <span
+                                class="font-medium"><?= $totalTeams ?></span> results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                            <!-- Previous -->
+                            <?php if ($page > 1): ?>
+                                <a href="?page=<?= $page - 1 ?><?= ($activeTab !== 'all' ? '&game=' . $activeTab : '') . ($activeRegion !== 'all' ? '&region=' . $activeRegion : '') . (!empty($_GET['q']) ? '&q=' . urlencode($_GET['q']) : '') ?>"
+                                    class="relative inline-flex items-center rounded-l-md px-2 py-2 text-zinc-400 ring-1 ring-inset ring-zinc-700 hover:bg-zinc-800 focus:z-20 focus:outline-offset-0">
+                                    <span class="sr-only">Previous</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd"
+                                            d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                                            clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                            <?php endif; ?>
+
+                            <!-- Current Page Indicator -->
+                            <span
+                                class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-zinc-700 bg-indigo-600 focus:z-20 focus:outline-offset-0">
+                                Page <?= $page ?> of <?= $totalPages ?>
+                            </span>
+
+                            <!-- Next -->
+                            <?php if ($page < $totalPages): ?>
+                                <a href="?page=<?= $page + 1 ?><?= ($activeTab !== 'all' ? '&game=' . $activeTab : '') . ($activeRegion !== 'all' ? '&region=' . $activeRegion : '') . (!empty($_GET['q']) ? '&q=' . urlencode($_GET['q']) : '') ?>"
+                                    class="relative inline-flex items-center rounded-r-md px-2 py-2 text-zinc-400 ring-1 ring-inset ring-zinc-700 hover:bg-zinc-800 focus:z-20 focus:outline-offset-0">
+                                    <span class="sr-only">Next</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd"
+                                            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                                            clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                            <?php endif; ?>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 

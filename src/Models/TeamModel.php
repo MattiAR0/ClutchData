@@ -31,7 +31,7 @@ class TeamModel
     /**
      * Get all teams, optionally filtered by game type
      */
-    public function getAllTeams(?string $gameType = null, ?string $region = null): array
+    public function getAllTeams(?string $gameType = null, ?string $region = null, ?string $search = null, int $limit = 1000, int $offset = 0): array
     {
         $sql = "SELECT * FROM teams WHERE 1=1";
         $params = [];
@@ -50,11 +50,58 @@ class TeamModel
             }
         }
 
-        $sql .= " ORDER BY name ASC";
+        if ($search) {
+            $sql .= " AND name LIKE :search";
+            $params['search'] = '%' . $search . '%';
+        }
+
+        $sql .= " ORDER BY name ASC LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
+        }
+        $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue('offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getTotalCount(?string $gameType = null, ?string $region = null, ?string $search = null): int
+    {
+        $sql = "SELECT COUNT(*) FROM teams WHERE 1=1";
+        $params = [];
+
+        if ($gameType && $gameType !== 'all') {
+            $sql .= " AND game_type = :game_type";
+            $params['game_type'] = $gameType;
+        }
+
+        if ($region && $region !== 'all') {
+            if ($region === 'Other') {
+                $sql .= " AND region NOT IN ('Americas', 'EMEA', 'Pacific')";
+            } else {
+                $sql .= " AND region = :region";
+                $params['region'] = $region;
+            }
+        }
+
+        if ($search) {
+            $sql .= " AND name LIKE :search";
+            $params['search'] = '%' . $search . '%';
+        }
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getLastTeamName(string $gameType): ?string
+    {
+        $stmt = $this->db->prepare("SELECT name FROM teams WHERE game_type = :game_type ORDER BY name DESC LIMIT 1");
+        $stmt->execute(['game_type' => $gameType]);
+        return $stmt->fetchColumn() ?: null;
     }
 
     /**

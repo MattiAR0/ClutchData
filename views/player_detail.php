@@ -24,7 +24,8 @@ $accentColor = match ($player['game_type']) {
         <!-- Photo -->
         <div class="flex-shrink-0">
             <?php if (!empty($player['photo_url'])): ?>
-                <img src="<?= htmlspecialchars($player['photo_url']) ?>" alt="<?= htmlspecialchars($player['nickname']) ?>"
+                <img src="image-proxy?url=<?= urlencode($player['photo_url']) ?>"
+                    alt="<?= htmlspecialchars($player['nickname']) ?>"
                     class="w-40 h-40 object-cover rounded-lg bg-zinc-800">
             <?php else: ?>
                 <div class="w-40 h-40 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-600">

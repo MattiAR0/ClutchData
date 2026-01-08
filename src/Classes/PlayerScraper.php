@@ -409,7 +409,7 @@ class PlayerScraper
     /**
      * Scrape list of players from Liquipedia Category page
      */
-    public function scrapePlayerList(string $gameType): array
+    public function scrapePlayerList(string $gameType, ?string $startFrom = null): array
     {
         $this->applySmartRateLimit();
         $players = [];
@@ -420,6 +420,11 @@ class PlayerScraper
 
         $path = $this->gamePaths[$gameType] ?? '/valorant/';
         $url = $path . $categoryName;
+
+        // Apply pagination parameter
+        if ($startFrom) {
+            $url .= '?from=' . urlencode($startFrom);
+        }
 
         try {
             $html = $this->fetch($url);

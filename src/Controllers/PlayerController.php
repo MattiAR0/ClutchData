@@ -34,22 +34,69 @@ class PlayerController
 
         $activeTab = $gameType ?? $_GET['game'] ?? 'all';
         $activeRegion = $_GET['region'] ?? 'all';
+        $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+        $limit = 24;
+        $offset = ($page - 1) * $limit;
 
         try {
-            $players = $this->playerModel->getAllPlayers(
-                $activeTab !== 'all' ? $activeTab : null
+            $search = $_GET['q'] ?? null;
+
+            // Get filtered count
+            $totalPlayers = $this->playerModel->getTotalCount(
+                $activeTab !== 'all' ? $activeTab : null,
+                null,
+                $search
             );
 
-            // Auto-Discovery: If we are on a specific game tab and still have NO players
-            if (empty($players) && $activeTab !== 'all') {
-                $this->discoverPlayers($activeTab);
-                // Re-fetch players
-                $players = $this->playerModel->getAllPlayers($activeTab);
+            // Get players with pagination
+            $players = $this->playerModel->getAllPlayers(
+                $activeTab !== 'all' ? $activeTab : null,
+                null,
+                $search,
+                $limit,
+                $offset
+            );
+
+            $totalPages = ceil($totalPlayers / $limit);
+
+            // LAZY SCRAPING LOGIC
+            if (empty($search) && $activeTab !== 'all' && ($page >= $totalPages || count($players) < $limit)) {
+                if ($totalPlayers === 0) {
+                    $this->discoverPlayers($activeTab);
+                    // Refresh
+                    $totalPlayers = $this->playerModel->getTotalCount($activeTab !== 'all' ? $activeTab : null, null, null);
+                    $totalPages = ceil($totalPlayers / $limit);
+                    $players = $this->playerModel->getAllPlayers($activeTab !== 'all' ? $activeTab : null, null, null, $limit, $offset);
+                } else {
+                    if ($page >= $totalPages) {
+                        $lastPlayerName = $this->playerModel->getLastPlayerName($activeTab);
+                        if ($lastPlayerName) {
+                            $scraper = new \App\Classes\PlayerScraper();
+                            $newPlayers = $scraper->scrapePlayerList($activeTab, $lastPlayerName);
+
+                            if (!empty($newPlayers)) {
+                                $countNew = 0;
+                                foreach ($newPlayers as $playerData) {
+                                    $this->playerModel->savePlayer($playerData);
+                                    $countNew++;
+                                }
+
+                                if ($countNew > 0) {
+                                    $totalPlayers = $this->playerModel->getTotalCount($activeTab !== 'all' ? $activeTab : null, null, null);
+                                    $players = $this->playerModel->getAllPlayers($activeTab !== 'all' ? $activeTab : null, null, null, $limit, $offset);
+                                    $totalPages = ceil($totalPlayers / $limit);
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
         } catch (Exception $e) {
             $error = "Error loading players: " . $e->getMessage();
             $players = [];
+            $totalPlayers = 0;
+            $totalPages = 0;
         }
 
         require __DIR__ . '/../../views/players.php';

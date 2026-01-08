@@ -10,6 +10,7 @@ use App\Controllers\MatchController;
 use App\Controllers\TeamController;
 use App\Controllers\PlayerController;
 use App\Controllers\ApiController;
+use App\Controllers\ImageProxyController;
 use Dotenv\Dotenv;
 
 // Cargar variables de entorno
@@ -51,6 +52,9 @@ $router->get('/players/sync', [PlayerController::class, 'sync']);
 $router->get('/players/discover', [PlayerController::class, 'discover']);
 $router->get('/players/sync-from-teams', [PlayerController::class, 'syncFromTeams']);
 $router->get('/player', [PlayerController::class, 'show']);
+
+// Image Proxy (Ephemeral)
+$router->get('/image-proxy', [ImageProxyController::class, 'handle']);
 
 // ============================================
 // API REST Endpoints (Fase 4 - Interoperabilidad)

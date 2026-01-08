@@ -31,7 +31,7 @@ class PlayerModel
     /**
      * Get all players, optionally filtered by game type
      */
-    public function getAllPlayers(?string $gameType = null, ?int $teamId = null): array
+    public function getAllPlayers(?string $gameType = null, ?int $teamId = null, ?string $search = null, int $limit = 1000, int $offset = 0): array
     {
         $sql = "SELECT p.*, t.name as team_name FROM players p 
                 LEFT JOIN teams t ON p.team_id = t.id 
@@ -48,11 +48,54 @@ class PlayerModel
             $params['team_id'] = $teamId;
         }
 
-        $sql .= " ORDER BY p.nickname ASC";
+        if ($search) {
+            $sql .= " AND (p.nickname LIKE :search OR p.real_name LIKE :search)";
+            $params['search'] = '%' . $search . '%';
+        }
+
+        $sql .= " ORDER BY p.nickname ASC LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
+        }
+        $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue('offset', $offset, PDO::PARAM_INT); // Fix bindValue for integer
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getTotalCount(?string $gameType = null, ?int $teamId = null, ?string $search = null): int
+    {
+        $sql = "SELECT COUNT(*) FROM players p WHERE 1=1";
+        $params = [];
+
+        if ($gameType && $gameType !== 'all') {
+            $sql .= " AND p.game_type = :game_type";
+            $params['game_type'] = $gameType;
+        }
+
+        if ($teamId) {
+            $sql .= " AND p.team_id = :team_id";
+            $params['team_id'] = $teamId;
+        }
+
+        if ($search) {
+            $sql .= " AND (p.nickname LIKE :search OR p.real_name LIKE :search)";
+            $params['search'] = '%' . $search . '%';
+        }
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getLastPlayerName(string $gameType): ?string
+    {
+        $stmt = $this->db->prepare("SELECT nickname FROM players WHERE game_type = :game_type ORDER BY nickname DESC LIMIT 1");
+        $stmt->execute(['game_type' => $gameType]);
+        return $stmt->fetchColumn() ?: null;
     }
 
     /**

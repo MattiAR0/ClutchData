@@ -24,7 +24,7 @@ $accentColor = match ($team['game_type']) {
         <!-- Logo -->
         <div class="flex-shrink-0">
             <?php if (!empty($team['logo_url'])): ?>
-                <img src="<?= htmlspecialchars($team['logo_url']) ?>" alt="<?= htmlspecialchars($team['name']) ?>"
+                <img src="image-proxy?url=<?= urlencode($team['logo_url']) ?>" alt="<?= htmlspecialchars($team['name']) ?>"
                     class="w-32 h-32 object-contain rounded-lg bg-zinc-800 p-4">
             <?php else: ?>
                 <div class="w-32 h-32 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-600">

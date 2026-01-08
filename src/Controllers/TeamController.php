@@ -35,19 +35,84 @@ class TeamController
 
         $activeTab = $gameType ?? $_GET['game'] ?? 'all';
         $activeRegion = $_GET['region'] ?? 'all';
+        $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+        $limit = 24;
+        $offset = ($page - 1) * $limit;
 
         // Update active tab logic to use the resolved game type
         $gameType = $activeTab;
 
         try {
-            // Get teams from database
-            $teams = $this->teamModel->getAllTeams($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null);
+            $search = $_GET['q'] ?? null;
 
-            // If no teams in DB (completely empty table), get unique teams from matches
-            // We verify hasAnyTeams() to avoid fallback when a FILTER returns empty results but DB has data
-            if (empty($teams) && !$this->teamModel->hasAnyTeams()) {
+            // Get filtered teams count
+            $totalTeams = $this->teamModel->getTotalCount(
+                $gameType !== 'all' ? $gameType : null,
+                $activeRegion !== 'all' ? $activeRegion : null,
+                $search
+            );
+
+            // Get teams from database with pagination
+            $teams = $this->teamModel->getAllTeams(
+                $gameType !== 'all' ? $gameType : null,
+                $activeRegion !== 'all' ? $activeRegion : null,
+                $search,
+                $limit,
+                $offset
+            );
+
+            // Calculate total pages
+            $totalPages = ceil($totalTeams / $limit);
+
+            // LAZY SCRAPING LOGIC
+            // If we are on a specific game view (not search, not 'all' games), and we hit the end of local data
+            // We should try to fetch the next batch from Liquipedia
+            if (empty($search) && $gameType !== 'all' && ($page >= $totalPages || count($teams) < $limit)) {
+
+                // If it's the very first load (no teams at all), discoverTeams handles it (starts from A)
+                // If we have some teams, we get the last one to use as offset
+                if ($totalTeams === 0) {
+                    $this->discoverTeams($gameType);
+                    // Refresh stats after discovery
+                    $totalTeams = $this->teamModel->getTotalCount($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null);
+                    $totalPages = ceil($totalTeams / $limit);
+                    $teams = $this->teamModel->getAllTeams($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null, null, $limit, $offset);
+                } else {
+                    // We have teams, but reached the end. Try to fetch more starting from the last known team.
+                    // Only do this if we are actually viewing the last page to avoid random triggers
+                    if ($page >= $totalPages) {
+                        $lastTeamName = $this->teamModel->getLastTeamName($gameType);
+                        if ($lastTeamName) {
+                            $scraper = new \App\Classes\TeamScraper();
+                            $newTeams = $scraper->scrapeTeamList($gameType, $lastTeamName);
+
+                            if (!empty($newTeams)) {
+                                $countNew = 0;
+                                foreach ($newTeams as $teamData) {
+                                    $this->teamModel->saveTeam($teamData);
+                                    $countNew++;
+                                }
+
+                                // Optimization: If we found new teams, re-query to show them immediately
+                                if ($countNew > 0) {
+                                    $totalTeams = $this->teamModel->getTotalCount($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null);
+                                    $teams = $this->teamModel->getAllTeams($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null, null, $limit, $offset);
+                                    $totalPages = ceil($totalTeams / $limit);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fallback for empty DB on 'all' view or search
+            if (empty($teams) && $totalTeams === 0 && empty($search)) {
                 $matchTeams = $this->teamModel->getTeamsFromMatches($gameType !== 'all' ? $gameType : null);
-                // Convert to display format (now includes region from match data)
+                // Apply manual array slicing for pagination since this is a fallback array
+                $totalTeams = count($matchTeams);
+                $totalPages = ceil($totalTeams / $limit);
+                $matchTeams = array_slice($matchTeams, $offset, $limit);
+
                 $teams = array_map(fn($t) => [
                     'id' => null,
                     'name' => $t['name'],
@@ -57,19 +122,11 @@ class TeamController
                 ], $matchTeams);
             }
 
-            // Auto-Discovery: If we are on a specific game tab and still have NO teams, try discovery
-            // This happens if matches didn't produce teams or it's a fresh install
-            if (empty($teams) && $gameType !== 'all' && $gameType !== null) {
-                // Determine if we should attempt discovery (check if we really have 0 teams for this game)
-                // We do a quick check to avoid infinite loops if discovery fails
-                $this->discoverTeams($gameType);
-                // Re-fetch teams
-                $teams = $this->teamModel->getAllTeams($gameType, $activeRegion !== 'all' ? $activeRegion : null);
-            }
-
         } catch (Exception $e) {
             $error = "Error loading teams: " . $e->getMessage();
             $teams = [];
+            $totalPages = 0;
+            $totalTeams = 0;
         }
 
         require __DIR__ . '/../../views/teams.php';
