@@ -55,6 +55,68 @@ class MatchModel
         }
     }
 
+    /**
+     * Guarda un partido individual verificando duplicados.
+     * Retorna true si se insertó un nuevo partido, false si ya existía.
+     */
+    public function saveMatch(array $match): bool
+    {
+        // Verificar si el partido ya existe (mismo equipo1, equipo2, torneo y fecha)
+        $checkStmt = $this->db->prepare("
+            SELECT id FROM matches 
+            WHERE team1_name = :team1 
+            AND team2_name = :team2 
+            AND tournament_name = :tournament 
+            AND DATE(match_time) = DATE(:time)
+            LIMIT 1
+        ");
+        $checkStmt->execute([
+            ':team1' => $match['team1'],
+            ':team2' => $match['team2'],
+            ':tournament' => $match['tournament'],
+            ':time' => $match['time']
+        ]);
+
+        if ($checkStmt->fetch()) {
+            return false; // Ya existe
+        }
+
+        // Insertar nuevo partido
+        $prediction = $this->calculateAiPrediction($match['team1'], $match['team2'], $match['game_type']);
+
+        $stmt = $this->db->prepare("
+            INSERT INTO matches (
+                game_type, team1_name, team2_name, tournament_name, match_time, 
+                match_region, team1_score, team2_score, match_status, match_url, 
+                ai_prediction, match_importance, vlr_match_id, hltv_match_id
+            ) 
+            VALUES (
+                :game_type, :team1, :team2, :tournament, :time, 
+                :region, :team1_score, :team2_score, :status, :url, 
+                :prediction, :importance, :vlr_match_id, :hltv_match_id
+            )
+        ");
+
+        $stmt->execute([
+            ':game_type' => $match['game_type'],
+            ':team1' => $match['team1'],
+            ':team2' => $match['team2'],
+            ':tournament' => $match['tournament'],
+            ':time' => $match['time'],
+            ':region' => $match['region'] ?? 'Other',
+            ':team1_score' => $match['team1_score'] ?? null,
+            ':team2_score' => $match['team2_score'] ?? null,
+            ':status' => $match['match_status'] ?? 'upcoming',
+            ':url' => $match['match_url'] ?? null,
+            ':prediction' => $prediction,
+            ':importance' => $match['match_importance'] ?? 0,
+            ':vlr_match_id' => $match['vlr_match_id'] ?? null,
+            ':hltv_match_id' => $match['hltv_match_id'] ?? null
+        ]);
+
+        return true;
+    }
+
     public function getAllMatches(?string $gameType = null, ?string $region = null, ?string $status = null): array
     {
         $sql = "SELECT *, 

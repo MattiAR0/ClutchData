@@ -27,6 +27,7 @@ class MatchController
         $matches = [];
         $error = $_SESSION['error'] ?? null;
         $message = $_SESSION['message'] ?? null;
+        $syncResult = null;
 
         // Pass current filter to view
         $activeTab = $gameType ?? 'all';
@@ -37,6 +38,9 @@ class MatchController
         unset($_SESSION['error']);
         unset($_SESSION['message']);
 
+        // Sincronizar datos al cargar la página (con rate limiting)
+        $syncResult = $this->autoSync();
+
         try {
             $matches = $this->model->getAllMatches($gameType, $activeRegion, $activeStatus);
         } catch (Exception $e) {
@@ -45,6 +49,62 @@ class MatchController
 
         // Cargar Vista
         require __DIR__ . '/../../views/home.php';
+    }
+
+    /**
+     * Sincroniza los partidos automáticamente al cargar la página.
+     * Tiene rate limiting de 5 minutos para evitar sobrecargar los scrapers.
+     */
+    private function autoSync(): array
+    {
+        $lockFile = __DIR__ . '/../../logs/last_update.lock';
+        $updateInterval = 300; // 5 minutos en segundos
+
+        // Verificar si debemos actualizar
+        $lastUpdate = file_exists($lockFile) ? (int) file_get_contents($lockFile) : 0;
+        $now = time();
+
+        if (($now - $lastUpdate) < $updateInterval) {
+            return [
+                'updated' => false,
+                'message' => 'Datos recientes (última actualización hace ' . ($now - $lastUpdate) . 's)'
+            ];
+        }
+
+        // Actualizar archivo de lock inmediatamente
+        @file_put_contents($lockFile, (string) $now);
+
+        // Actualizar partidos de todos los juegos
+        $scrapers = [
+            'valorant' => new ValorantScraper(),
+            'cs2' => new Cs2Scraper(),
+            'lol' => new LolScraper()
+        ];
+
+        $results = [];
+        $totalNew = 0;
+
+        foreach ($scrapers as $game => $scraper) {
+            try {
+                $matches = $scraper->scrapeMatches();
+                $saved = 0;
+                foreach ($matches as $match) {
+                    if ($this->model->saveMatch($match)) {
+                        $saved++;
+                    }
+                }
+                $results[$game] = ['found' => count($matches), 'new' => $saved];
+                $totalNew += $saved;
+            } catch (Exception $e) {
+                $results[$game] = ['error' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'updated' => true,
+            'total_new' => $totalNew,
+            'results' => $results
+        ];
     }
 
     public function scrape()
