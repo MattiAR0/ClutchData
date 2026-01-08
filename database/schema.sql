@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS matches (
     vlr_match_id VARCHAR(50) DEFAULT NULL,
     hltv_match_id VARCHAR(50) DEFAULT NULL,
     match_details JSON DEFAULT NULL,
+    ai_explanation TEXT DEFAULT NULL,
+    ai_source ENUM('gemini', 'elo', 'fallback') DEFAULT 'elo',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

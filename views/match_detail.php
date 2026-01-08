@@ -135,12 +135,35 @@
                 </div>
 
                 <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+                    <!-- AI Source Badge -->
+                    <?php
+                    $aiSource = $match['ai_source'] ?? 'elo';
+                    $isGemini = $aiSource === 'gemini';
+                    ?>
+                    <div class="absolute top-4 right-4">
+                        <?php if ($isGemini): ?>
+                            <span
+                                class="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-[10px] text-blue-400 font-bold uppercase tracking-widest backdrop-blur-sm shadow-lg">
+                                <svg class="w-3 h-3 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                </svg>
+                                Gemini AI
+                            </span>
+                        <?php else: ?>
+                            <span
+                                class="inline-flex items-center px-3 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/50 text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
+                                <span class="w-1.5 h-1.5 rounded-full bg-zinc-500 mr-2"></span>
+                                ELO Rating
+                            </span>
+                        <?php endif; ?>
+                    </div>
+
                     <div class="flex justify-between items-end mb-4 relative z-10">
                         <div class="text-left">
                             <span class="block text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Team
                                 A</span>
                             <span
-                                class="text-4xl font-black text-indigo-500 tabular-nums tracking-tighter drop-shadow-sm"><?= number_format($match['ai_prediction'], 1) ?>%</span>
+                                class="text-4xl font-black text-indigo-500 tabular-nums tracking-tighter drop-shadow-sm"><?= number_format($match['ai_prediction'] ?? 50, 1) ?>%</span>
                         </div>
                         <!-- V Divider -->
                         <div class="text-zinc-700 font-black text-xl self-center opacity-20">/</div>
@@ -149,30 +172,44 @@
                             <span class="block text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Team
                                 B</span>
                             <span
-                                class="text-4xl font-black text-rose-500 tabular-nums tracking-tighter drop-shadow-sm"><?= number_format(100 - $match['ai_prediction'], 1) ?>%</span>
+                                class="text-4xl font-black text-rose-500 tabular-nums tracking-tighter drop-shadow-sm"><?= number_format(100 - ($match['ai_prediction'] ?? 50), 1) ?>%</span>
                         </div>
                     </div>
 
                     <div class="h-3 bg-zinc-800 rounded-full overflow-hidden flex ring-1 ring-zinc-700/50">
                         <div class="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 shadow-[0_0_10px_rgba(99,102,241,0.5)] relative"
-                            style="width: <?= $match['ai_prediction'] ?>%">
+                            style="width: <?= $match['ai_prediction'] ?? 50 ?>%">
                             <div
                                 class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30">
                             </div>
                         </div>
                         <div class="h-full bg-zinc-800 w-px"></div>
                         <div class="h-full bg-gradient-to-l from-rose-500 to-rose-600 shadow-[0_0_10px_rgba(244,63,94,0.5)] relative"
-                            style="width: <?= 100 - $match['ai_prediction'] ?>%">
+                            style="width: <?= 100 - ($match['ai_prediction'] ?? 50) ?>%">
                             <div
                                 class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30">
                             </div>
                         </div>
                     </div>
 
+                    <!-- AI Explanation -->
                     <div class="mt-4 text-center">
-                        <p class="text-[10px] text-zinc-600 font-mono">
-                            Based on historical performance & recent form
-                        </p>
+                        <?php if (!empty($match['ai_explanation']) && $isGemini): ?>
+                            <div class="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700/50">
+                                <p class="text-sm text-zinc-300 leading-relaxed">
+                                    <svg class="w-4 h-4 inline-block mr-1 text-blue-400 -mt-0.5" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                    </svg>
+                                    <?= htmlspecialchars($match['ai_explanation']) ?>
+                                </p>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-[10px] text-zinc-600 font-mono">
+                                Basado en rating ELO y estadísticas históricas
+                            </p>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -508,7 +545,7 @@
                         function loadMapStats(mapName) {
                             currentMap = mapName;
                             contentEl.innerHTML = '<div class="text-center py-8"><div class="w-8 h-8 border-4 border-zinc-700 border-t-indigo-500 rounded-full animate-spin mx-auto"></div></div>';
-                            
+
                             fetch(`./api/match/stats?id=${matchId}&map=${encodeURIComponent(mapName)}`)
                                 .then(response => response.json())
                                 .then(data => {
@@ -535,8 +572,8 @@
                                 tabsHtml = '<div class="flex flex-wrap justify-center gap-2 mb-6">';
                                 maps.forEach(map => {
                                     const isActive = map === activeMap;
-                                    const activeClass = isActive 
-                                        ? 'bg-indigo-600 text-white border-indigo-500' 
+                                    const activeClass = isActive
+                                        ? 'bg-indigo-600 text-white border-indigo-500'
                                         : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700 hover:text-white';
                                     const label = map === 'overall' ? 'All Maps' : map;
                                     tabsHtml += `<button onclick="window.loadMapStats('${escapeHtml(map)}')" class="px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded-lg transition-all ${activeClass}">${escapeHtml(label)}</button>`;

@@ -9,6 +9,7 @@ use App\Classes\LolScraper;
 use App\Classes\Cs2Scraper;
 use App\Classes\VlrScraper;
 use App\Classes\HltvScraper;
+use App\Classes\MatchPredictor;
 use App\Models\MatchModel;
 use App\Models\PlayerStatsModel;
 use Exception;
@@ -250,7 +251,52 @@ class MatchController
         // Merge stats from both sources (VLR/HLTV prioritized, Liquipedia as fallback)
         $match['merged_stats'] = $this->mergePlayerStats($match);
 
+        // Get AI prediction with Gemini (only for upcoming matches or if no cached explanation)
+        if (empty($match['ai_explanation']) && $match['match_status'] === 'upcoming') {
+            try {
+                $predictor = new MatchPredictor();
+                $aiResult = $predictor->predictMatchWithAI($match);
+
+                // Update match data with AI results
+                $match['ai_prediction'] = $aiResult['prediction'];
+                $match['ai_explanation'] = $aiResult['explanation'];
+                $match['ai_source'] = $aiResult['source'];
+
+                // Cache the AI explanation in database
+                if (!empty($aiResult['explanation']) && $aiResult['source'] === 'gemini') {
+                    $this->saveAiExplanation((int) $match['id'], $aiResult);
+                }
+            } catch (Exception $e) {
+                error_log("AI prediction failed: " . $e->getMessage());
+            }
+        }
+
         require __DIR__ . '/../../views/match_detail.php';
+    }
+
+    /**
+     * Save AI explanation to database cache
+     */
+    private function saveAiExplanation(int $matchId, array $aiResult): void
+    {
+        try {
+            $db = $this->model->getConnection();
+            $stmt = $db->prepare("
+                UPDATE matches 
+                SET ai_prediction = :prediction, 
+                    ai_explanation = :explanation,
+                    ai_source = :source 
+                WHERE id = :id
+            ");
+            $stmt->execute([
+                ':prediction' => $aiResult['prediction'],
+                ':explanation' => $aiResult['explanation'],
+                ':source' => $aiResult['source'],
+                ':id' => $matchId
+            ]);
+        } catch (Exception $e) {
+            error_log("Failed to save AI explanation: " . $e->getMessage());
+        }
     }
     /**
      * Merge player stats from VLR.gg/HLTV and Liquipedia into unified format
