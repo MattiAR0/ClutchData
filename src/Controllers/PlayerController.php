@@ -39,6 +39,14 @@ class PlayerController
             $players = $this->playerModel->getAllPlayers(
                 $activeTab !== 'all' ? $activeTab : null
             );
+
+            // Auto-Discovery: If we are on a specific game tab and still have NO players
+            if (empty($players) && $activeTab !== 'all') {
+                $this->discoverPlayers($activeTab);
+                // Re-fetch players
+                $players = $this->playerModel->getAllPlayers($activeTab);
+            }
+
         } catch (Exception $e) {
             $error = "Error loading players: " . $e->getMessage();
             $players = [];
@@ -319,5 +327,50 @@ class PlayerController
         }
 
         $this->redirectToIndex($gameFilter !== 'all' ? $gameFilter : null);
+    }
+
+    /**
+     * Discover players from Liquipedia Category pages (Bulk Import)
+     */
+    public function discover(): void
+    {
+        $gameType = $_GET['game'] ?? 'valorant';
+
+        try {
+            $this->discoverPlayers($gameType);
+            $_SESSION['message'] = "✅ Player discovery completed for " . ucfirst($gameType);
+        } catch (Exception $e) {
+            $_SESSION['error'] = "Discovery failed: " . $e->getMessage();
+        }
+
+        $this->redirectToIndex($gameType);
+    }
+
+    /**
+     * Logic to discover players and save them
+     */
+    private function discoverPlayers(string $gameType): void
+    {
+        $scraper = new PlayerScraper();
+        $discoveredPlayers = $scraper->scrapePlayerList($gameType);
+        $count = 0;
+
+        foreach ($discoveredPlayers as $playerData) {
+            // Check if exists
+            $existing = $this->playerModel->getPlayerByNickname($playerData['nickname'], $gameType);
+
+            if (!$existing) {
+                // Determine team ID if current_team is set (unlikely for discovery list, usually null)
+                $teamId = null;
+                // Save minimally
+                $this->playerModel->savePlayer([
+                    'nickname' => $playerData['nickname'],
+                    'game_type' => $gameType,
+                    'team_id' => $teamId,
+                    'liquipedia_url' => $playerData['liquipedia_url']
+                ]);
+                $count++;
+            }
+        }
     }
 }

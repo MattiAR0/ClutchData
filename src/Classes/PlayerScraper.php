@@ -235,14 +235,21 @@ class PlayerScraper
     protected function extractPhoto(Crawler $crawler): ?string
     {
         try {
-            $photoNode = $crawler->filter('.infobox-image img');
-            if ($photoNode->count() > 0) {
-                $src = $photoNode->first()->attr('src');
-                // Handle relative URLs
-                if ($src && !str_starts_with($src, 'http')) {
-                    return 'https://liquipedia.net' . $src;
+            $selectors = [
+                '.infobox-image.lightmode img',
+                '.infobox-image img'
+            ];
+
+            foreach ($selectors as $selector) {
+                $photoNode = $crawler->filter($selector);
+                if ($photoNode->count() > 0) {
+                    $src = $photoNode->first()->attr('src');
+                    // Handle relative URLs
+                    if ($src && !str_starts_with($src, 'http')) {
+                        return 'https://liquipedia.net' . $src;
+                    }
+                    return $src;
                 }
-                return $src;
             }
         } catch (Exception $e) {
             // Ignore errors
@@ -398,5 +405,65 @@ class PlayerScraper
         }
 
         return $history;
+    }
+    /**
+     * Scrape list of players from Liquipedia Category page
+     */
+    public function scrapePlayerList(string $gameType): array
+    {
+        $this->applySmartRateLimit();
+        $players = [];
+
+        // Determine category URL based on game
+        // Usually it's Category:Players for all wikis
+        $categoryName = 'Category:Players';
+
+        $path = $this->gamePaths[$gameType] ?? '/valorant/';
+        $url = $path . $categoryName;
+
+        try {
+            $html = $this->fetch($url);
+
+            if (empty($html)) {
+                return [];
+            }
+
+            $crawler = new Crawler($html);
+
+            $links = $crawler->filter('.mw-category a, .mw-category-group a');
+
+            $links->each(function (Crawler $node) use (&$players, $gameType) {
+                $text = trim($node->text());
+                $href = $node->attr('href');
+
+                // Filter out non-player pages
+                if (
+                    !str_contains($href, 'Category:') &&
+                    !str_contains($href, 'File:') &&
+                    !str_contains($href, 'Template:') &&
+                    !str_contains($href, 'User:') &&
+                    !str_contains($href, 'Talk:')
+                ) {
+                    $players[] = [
+                        'nickname' => $text,
+                        'game_type' => $gameType,
+                        'liquipedia_url' => $this->baseUrl . $href,
+                        // Default values for minimal entry
+                        'real_name' => null,
+                        'current_team' => null,
+                        'country' => null,
+                        'role' => null,
+                        'photo_url' => null,
+                        'birthdate' => null,
+                        'description' => null
+                    ];
+                }
+            });
+
+        } catch (Exception $e) {
+            error_log("PlayerScraper list fetch error: " . $e->getMessage());
+        }
+
+        return $players;
     }
 }

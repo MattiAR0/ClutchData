@@ -33,8 +33,11 @@ class TeamController
         $message = $_SESSION['message'] ?? null;
         unset($_SESSION['error'], $_SESSION['message']);
 
-        $activeTab = $gameType ?? 'all';
+        $activeTab = $gameType ?? $_GET['game'] ?? 'all';
         $activeRegion = $_GET['region'] ?? 'all';
+
+        // Update active tab logic to use the resolved game type
+        $gameType = $activeTab;
 
         try {
             // Get teams from database
@@ -53,6 +56,17 @@ class TeamController
                     'logo_url' => null
                 ], $matchTeams);
             }
+
+            // Auto-Discovery: If we are on a specific game tab and still have NO teams, try discovery
+            // This happens if matches didn't produce teams or it's a fresh install
+            if (empty($teams) && $gameType !== 'all' && $gameType !== null) {
+                // Determine if we should attempt discovery (check if we really have 0 teams for this game)
+                // We do a quick check to avoid infinite loops if discovery fails
+                $this->discoverTeams($gameType);
+                // Re-fetch teams
+                $teams = $this->teamModel->getAllTeams($gameType, $activeRegion !== 'all' ? $activeRegion : null);
+            }
+
         } catch (Exception $e) {
             $error = "Error loading teams: " . $e->getMessage();
             $teams = [];
@@ -446,8 +460,8 @@ class TeamController
             UPDATE matches 
             SET match_region = :region 
             WHERE (team1_name = :team1 OR team2_name = :team2) 
-              AND game_type = :game_type 
-              AND (match_region = 'Other' OR match_region IS NULL)
+            AND game_type = :game_type 
+            AND (match_region = 'Other' OR match_region IS NULL)
         ");
 
         $stmt->execute([
@@ -456,5 +470,45 @@ class TeamController
             'team2' => $teamName,
             'game_type' => $gameType
         ]);
+    }
+
+    /**
+     * Discover teams from Liquipedia Category pages (Bulk Import)
+     */
+    public function discover(): void
+    {
+        $gameType = $_GET['game'] ?? 'valorant';
+
+        try {
+            $this->discoverTeams($gameType);
+            $_SESSION['message'] = "✅ Team discovery completed for " . ucfirst($gameType);
+        } catch (Exception $e) {
+            $_SESSION['error'] = "Discovery failed: " . $e->getMessage();
+        }
+
+        // Redirect back
+        $redirectUrl = str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']) . '/teams?game=' . $gameType;
+        header('Location: ' . $redirectUrl);
+        exit;
+    }
+
+    /**
+     * Logic to discover teams and save them
+     */
+    private function discoverTeams(string $gameType): void
+    {
+        $scraper = new TeamScraper();
+        $discoveredTeams = $scraper->scrapeTeamList($gameType);
+        $count = 0;
+
+        foreach ($discoveredTeams as $teamData) {
+            // Check if exists
+            $existing = $this->teamModel->getTeamByNameAndGame($teamData['name'], $gameType);
+
+            if (!$existing) {
+                $this->teamModel->saveTeam($teamData);
+                $count++;
+            }
+        }
     }
 }

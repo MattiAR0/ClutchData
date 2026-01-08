@@ -238,6 +238,7 @@ class TeamScraper
             // Fallback: check category links
             $categories = $crawler->filter('a[href*="Category:"]');
             foreach ($categories as $cat) {
+                /** @var \DOMElement $cat */
                 $href = $cat->getAttribute('href');
                 if (str_contains($href, 'North_America') || str_contains($href, 'United_States') || str_contains($href, 'Canada') || str_contains($href, 'Brazil'))
                     return 'Americas';
@@ -317,6 +318,7 @@ class TeamScraper
         try {
             // Try multiple selectors for logo
             $selectors = [
+                '.infobox-image.lightmode img',
                 '.infobox-image img',
                 '.team-template-image img',
                 '.floatleft img',
@@ -494,6 +496,7 @@ class TeamScraper
                     // Check for role images
                     $imgs = $parent->getElementsByTagName('img');
                     foreach ($imgs as $img) {
+                        /** @var \DOMElement $img */
                         $alt = strtolower($img->getAttribute('alt') ?? '');
                         $title = strtolower($img->getAttribute('title') ?? '');
 
@@ -653,5 +656,71 @@ class TeamScraper
         }
 
         return array_slice($results, 0, 5);
+    }
+    /**
+     * Scrape list of teams from Liquipedia Category page
+     */
+    public function scrapeTeamList(string $gameType): array
+    {
+        $this->applySmartRateLimit();
+        $teams = [];
+
+        // Determine category URL based on game
+        $categoryName = match ($gameType) {
+            'valorant' => 'Category:Teams', // Valorant specific wiki logic
+            'cs2' => 'Category:CS2_Teams',
+            'lol' => 'Category:Teams',
+            default => 'Category:Teams'
+        };
+
+        // Build the full URL
+        // Note: For Valorant it's just /valorant/Category:Teams
+        // For others it follows their specific path structure
+        $path = $this->gamePaths[$gameType] ?? '/valorant/';
+        $url = $path . $categoryName;
+
+        try {
+            $html = $this->fetch($url);
+
+            if (empty($html)) {
+                return [];
+            }
+
+            $crawler = new Crawler($html);
+
+            // Liquipedia categories usually list pages in .mw-category-group ul li a
+            // or just .mw-category a
+            $links = $crawler->filter('.mw-category a, .mw-category-group a');
+
+            $links->each(function (Crawler $node) use (&$teams, $gameType) {
+                $text = trim($node->text());
+                $href = $node->attr('href');
+
+                // Filter out non-team pages (categories, files, etc)
+                if (
+                    !str_contains($href, 'Category:') &&
+                    !str_contains($href, 'File:') &&
+                    !str_contains($href, 'Template:') &&
+                    !str_contains($href, 'User:') &&
+                    !str_contains($href, 'Talk:')
+                ) {
+                    $teams[] = [
+                        'name' => $text,
+                        'game_type' => $gameType,
+                        'liquipedia_url' => $this->baseUrl . $href,
+                        // Default values for minimal entry
+                        'region' => 'Other',
+                        'country' => null,
+                        'logo_url' => null,
+                        'description' => null
+                    ];
+                }
+            });
+
+        } catch (Exception $e) {
+            error_log("TeamScraper list fetch error: " . $e->getMessage());
+        }
+
+        return $teams;
     }
 }
