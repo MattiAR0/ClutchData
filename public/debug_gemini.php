@@ -13,7 +13,7 @@ echo "<h1>Gemini API Debug</h1>";
 echo "<pre>";
 echo "API Key: " . substr($apiKey, 0, 15) . "...\n\n";
 
-$url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $apiKey;
+$url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=" . $apiKey;
 
 $data = json_encode([
     'contents' => [['parts' => [['text' => 'Say "Hello" in one word only.']]]],

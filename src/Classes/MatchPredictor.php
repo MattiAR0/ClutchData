@@ -78,6 +78,15 @@ class MatchPredictor
         // Get team stats for context
         $team1Stats = $this->getTeamStats($team1, $gameType);
         $team2Stats = $this->getTeamStats($team2, $gameType);
+
+        // Get detailed recent match history
+        $team1RecentDetails = $this->getRecentMatchDetails($team1, $gameType);
+        $team2RecentDetails = $this->getRecentMatchDetails($team2, $gameType);
+
+        // Get advanced team stats (if available)
+        $team1AdvancedStats = $this->getTeamAverageStats($team1, $gameType);
+        $team2AdvancedStats = $this->getTeamAverageStats($team2, $gameType);
+
         $h2hRecord = $this->getH2HRecord($team1, $team2, $gameType);
 
         // Try Gemini first
@@ -86,7 +95,11 @@ class MatchPredictor
                 $matchData,
                 $team1Stats,
                 $team2Stats,
-                $h2hRecord
+                $h2hRecord,
+                $team1RecentDetails,
+                $team2RecentDetails,
+                $team1AdvancedStats,
+                $team2AdvancedStats
             );
 
             if ($result['source'] === 'gemini') {
@@ -101,6 +114,84 @@ class MatchPredictor
             'explanation' => "Predicción basada en rating ELO ({$team1Stats['elo']} vs {$team2Stats['elo']}) y estadísticas históricas.",
             'source' => 'elo'
         ];
+    }
+
+    /**
+     * Get detailed recent matches for prompt context
+     */
+    private function getRecentMatchDetails(string $team, string $gameType, int $limit = 5): array
+    {
+        $matches = $this->getCompletedMatchesForTeam($team, $gameType);
+        $details = [];
+
+        // Take only the last $limit matches
+        $recentMatches = array_slice(array_reverse($matches), 0, $limit); // matches are usually ASC in internal method, so reverse for DESC
+
+        foreach ($recentMatches as $match) {
+            $isTeam1 = strtolower($match['team1_name']) === strtolower($team);
+            $opponent = $isTeam1 ? $match['team2_name'] : $match['team1_name'];
+            $score1 = (int) ($match['team1_score'] ?? 0);
+            $score2 = (int) ($match['team2_score'] ?? 0);
+
+            $myScore = $isTeam1 ? $score1 : $score2;
+            $opScore = $isTeam1 ? $score2 : $score1;
+
+            $result = ($myScore > $opScore) ? 'Win' : 'Loss';
+            if ($myScore === $opScore)
+                $result = 'Draw';
+
+            $details[] = sprintf(
+                "vs %s: %s %d-%d",
+                $opponent,
+                $result,
+                $myScore,
+                $opScore
+            );
+        }
+
+        return $details;
+    }
+
+    /**
+     * Get average advanced stats for a team (if available in player_stats)
+     */
+    private function getTeamAverageStats(string $team, string $gameType): array
+    {
+        try {
+            // Check if player_stats has data for this team
+            // We join with matches to ensure game_type matches
+            $stmt = $this->db->prepare("
+                SELECT 
+                    AVG(ps.rating) as avg_rating,
+                    AVG(ps.acs) as avg_acs,
+                    AVG(ps.kast) as avg_kast
+                FROM player_stats ps
+                JOIN matches m ON ps.match_id = m.id
+                WHERE ps.team_name = :team
+                  AND m.game_type = :game_type
+                  AND ps.created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+            ");
+
+            $stmt->execute([':team' => $team, ':game_type' => $gameType]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$result || $result['avg_rating'] === null) {
+                return [];
+            }
+
+            $stats = [];
+            if ($result['avg_rating'])
+                $stats['avg_rating'] = number_format((float) $result['avg_rating'], 2);
+            if ($result['avg_acs'])
+                $stats['avg_acs'] = round((float) $result['avg_acs']);
+            if ($result['avg_kast'])
+                $stats['avg_kast'] = number_format((float) $result['avg_kast'], 1) . '%';
+
+            return $stats;
+        } catch (\Exception $e) {
+            // Table might not exist or other error
+            return [];
+        }
     }
 
     /**

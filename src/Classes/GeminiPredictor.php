@@ -16,7 +16,7 @@ class GeminiPredictor
 {
     private string $apiKey;
     private ?MonologLogger $logger;
-    private const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    private const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
     private const RATE_LIMIT_DELAY = 1; // segundos entre llamadas
     private const API_TIMEOUT = 60; // segundos de timeout (aumentado para priorizar IA)
     private const MAX_RETRIES = 2; // reintentos si falla
@@ -46,11 +46,28 @@ class GeminiPredictor
      * @param array $h2hRecord Historial de enfrentamientos directos
      * @return array{prediction: float, explanation: string, source: string}
      */
+    /**
+     * Analiza un partido y genera predicción + explicación
+     * 
+     * @param array $matchData Datos del partido (team1, team2, tournament, etc.)
+     * @param array $team1Stats Estadísticas históricas del equipo 1
+     * @param array $team2Stats Estadísticas históricas del equipo 2
+     * @param array $h2hRecord Historial de enfrentamientos directos
+     * @param array $team1RecentDetails Detalles de últimos partidos del equipo 1
+     * @param array $team2RecentDetails Detalles de últimos partidos del equipo 2
+     * @param array $team1AdvancedStats Estadísticas avanzadas promedio del equipo 1 (Rating, ACS, etc)
+     * @param array $team2AdvancedStats Estadísticas avanzadas promedio del equipo 2
+     * @return array{prediction: float, explanation: string, source: string}
+     */
     public function analyzeMatch(
         array $matchData,
         array $team1Stats = [],
         array $team2Stats = [],
-        array $h2hRecord = []
+        array $h2hRecord = [],
+        array $team1RecentDetails = [],
+        array $team2RecentDetails = [],
+        array $team1AdvancedStats = [],
+        array $team2AdvancedStats = []
     ): array {
         if (!$this->isConfigured()) {
             $this->log('warning', 'Gemini API key not configured, using fallback');
@@ -64,7 +81,16 @@ class GeminiPredictor
         $lastError = '';
         for ($attempt = 1; $attempt <= self::MAX_RETRIES; $attempt++) {
             try {
-                $prompt = $this->buildPrompt($matchData, $team1Stats, $team2Stats, $h2hRecord);
+                $prompt = $this->buildPrompt(
+                    $matchData,
+                    $team1Stats,
+                    $team2Stats,
+                    $h2hRecord,
+                    $team1RecentDetails,
+                    $team2RecentDetails,
+                    $team1AdvancedStats,
+                    $team2AdvancedStats
+                );
                 $response = $this->callGeminiAPI($prompt);
 
                 if ($response) {
@@ -97,48 +123,74 @@ class GeminiPredictor
         array $matchData,
         array $team1Stats,
         array $team2Stats,
-        array $h2hRecord
+        array $h2hRecord,
+        array $team1RecentDetails,
+        array $team2RecentDetails,
+        array $team1AdvancedStats,
+        array $team2AdvancedStats
     ): string {
         $team1 = $matchData['team1'] ?? $matchData['team1_name'] ?? 'Team 1';
         $team2 = $matchData['team2'] ?? $matchData['team2_name'] ?? 'Team 2';
         $game = $matchData['game_type'] ?? 'esports';
         $tournament = $matchData['tournament'] ?? $matchData['tournament_name'] ?? 'Tournament';
 
-        $prompt = "You are an esports analyst. Analyze this {$game} match and predict the winner.\n\n";
-        $prompt .= "MATCH: {$team1} vs {$team2}\n";
-        $prompt .= "TOURNAMENT: {$tournament}\n\n";
+        // Engineering the System Role
+        $prompt = "You are an elite expert analyst for {$game} esports matches. Your job is to predict the winner based on deep analysis of form, statistics, and matchups.\n\n";
 
-        // Estadísticas del equipo 1
-        if (!empty($team1Stats)) {
-            $prompt .= "=== {$team1} STATS ===\n";
-            $prompt .= "Recent matches: {$team1Stats['recent_matches']} (W: {$team1Stats['wins']}, L: {$team1Stats['losses']})\n";
-            $prompt .= "Win rate: " . number_format(($team1Stats['win_rate'] ?? 0) * 100, 1) . "%\n";
-            if (isset($team1Stats['elo'])) {
-                $prompt .= "ELO Rating: {$team1Stats['elo']}\n";
+        $prompt .= "MATCH CONTEXT:\n";
+        $prompt .= "Teams: {$team1} vs {$team2}\n";
+        $prompt .= "Tournament: {$tournament}\n\n";
+
+        // Helper to format stats block
+        $formatStats = function ($name, $stats, $recent, $advanced) {
+            $str = "=== {$name} PROFILE ===\n";
+
+            // Basic Stats
+            if (!empty($stats)) {
+                $winRate = number_format(($stats['win_rate'] ?? 0) * 100, 1);
+                $str .= "Overall Record: {$stats['wins']}W-{$stats['losses']}L ({$winRate}%)\n";
+                if (isset($stats['elo']))
+                    $str .= "ELO Rating: {$stats['elo']}\n";
             }
-            $prompt .= "\n";
-        }
 
-        // Estadísticas del equipo 2
-        if (!empty($team2Stats)) {
-            $prompt .= "=== {$team2} STATS ===\n";
-            $prompt .= "Recent matches: {$team2Stats['recent_matches']} (W: {$team2Stats['wins']}, L: {$team2Stats['losses']})\n";
-            $prompt .= "Win rate: " . number_format(($team2Stats['win_rate'] ?? 0) * 100, 1) . "%\n";
-            if (isset($team2Stats['elo'])) {
-                $prompt .= "ELO Rating: {$team2Stats['elo']}\n";
+            // Advanced Stats
+            if (!empty($advanced)) {
+                $str .= "Team Averages (Last 90 days): ";
+                $parts = [];
+                foreach ($advanced as $key => $val)
+                    $parts[] = strtoupper(str_replace('avg_', '', $key)) . ": {$val}";
+                $str .= implode(', ', $parts) . "\n";
             }
-            $prompt .= "\n";
-        }
 
-        // Historial H2H
+            // Recent Detailed History
+            if (!empty($recent)) {
+                $str .= "Recent Form (Last 5):\n";
+                foreach ($recent as $match) {
+                    $str .= "- {$match}\n";
+                }
+            }
+            $str .= "\n";
+            return $str;
+        };
+
+        $prompt .= $formatStats($team1, $team1Stats, $team1RecentDetails, $team1AdvancedStats);
+        $prompt .= $formatStats($team2, $team2Stats, $team2RecentDetails, $team2AdvancedStats);
+
+        // H2H
         if (!empty($h2hRecord)) {
-            $prompt .= "=== HEAD TO HEAD ===\n";
-            $prompt .= "{$team1}: {$h2hRecord['team1_wins']} wins\n";
-            $prompt .= "{$team2}: {$h2hRecord['team2_wins']} wins\n\n";
+            $prompt .= "=== HEAD TO HEAD HISTORY ===\n";
+            $prompt .= "{$team1} Wins: {$h2hRecord['team1_wins']}\n";
+            $prompt .= "{$team2} Wins: {$h2hRecord['team2_wins']}\n\n";
         }
 
-        $prompt .= "RESPOND IN THIS EXACT JSON FORMAT ONLY (no markdown, no extra text):\n";
-        $prompt .= '{"team1_win_probability": <number 0-100>, "analysis": "<brief 1-2 sentence analysis in Spanish>"}';
+        $prompt .= "ANALYSIS INSTRUCTIONS:\n";
+        $prompt .= "1. Compare the recent form of both teams. Look at WHO they played, not just W/L.\n";
+        $prompt .= "2. Consider the team averages (Rating, ACS, KAST) if available to judge individual skill ceilings.\n";
+        $prompt .= "3. Identify ONE key factor (map pool, star player performance, or tactical matchup) that will decide this game.\n";
+        $prompt .= "4. Provide a win probability for {$team1}.\n";
+
+        $prompt .= "\nRESPOND IN THIS EXACT JSON FORMAT ONLY (no markdown, no code blocks):\n";
+        $prompt .= '{"team1_win_probability": <number 0-100>, "analysis": "<Your expert analysis in Spanish. Keep it under 280 characters. Mention the key factor.>"}';
 
         return $prompt;
     }
