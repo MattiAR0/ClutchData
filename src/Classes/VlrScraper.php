@@ -41,6 +41,79 @@ class VlrScraper implements ScraperInterface
     }
 
     /**
+     * Normalize text for comparison (remove accents and special chars)
+     * This allows matching "KRU" with "KRÜ", "Leviatan" with "LEVIATÁN", etc.
+     */
+    protected function normalizeForComparison(string $text): string
+    {
+        $text = strtolower(trim($text));
+
+        // Manual accent mapping for common characters
+        $accentMap = [
+            'á' => 'a',
+            'à' => 'a',
+            'ä' => 'a',
+            'â' => 'a',
+            'ã' => 'a',
+            'é' => 'e',
+            'è' => 'e',
+            'ë' => 'e',
+            'ê' => 'e',
+            'í' => 'i',
+            'ì' => 'i',
+            'ï' => 'i',
+            'î' => 'i',
+            'ó' => 'o',
+            'ò' => 'o',
+            'ö' => 'o',
+            'ô' => 'o',
+            'õ' => 'o',
+            'ú' => 'u',
+            'ù' => 'u',
+            'ü' => 'u',
+            'û' => 'u',
+            'ñ' => 'n',
+            'ç' => 'c',
+            'Á' => 'a',
+            'À' => 'a',
+            'Ä' => 'a',
+            'Â' => 'a',
+            'Ã' => 'a',
+            'É' => 'e',
+            'È' => 'e',
+            'Ë' => 'e',
+            'Ê' => 'e',
+            'Í' => 'i',
+            'Ì' => 'i',
+            'Ï' => 'i',
+            'Î' => 'i',
+            'Ó' => 'o',
+            'Ò' => 'o',
+            'Ö' => 'o',
+            'Ô' => 'o',
+            'Õ' => 'o',
+            'Ú' => 'u',
+            'Ù' => 'u',
+            'Ü' => 'u',
+            'Û' => 'u',
+            'Ñ' => 'n',
+            'Ç' => 'c',
+        ];
+
+        $text = strtr($text, $accentMap);
+
+        // Remove common suffixes
+        $text = preg_replace('/(\s*)esports?$/i', '', $text);
+        $text = preg_replace('/(\s*)gaming$/i', '', $text);
+        $text = preg_replace('/(\s*)team$/i', '', $text);
+
+        // Remove extra spaces
+        $text = trim($text);
+
+        return $text;
+    }
+
+    /**
      * Fetch HTML con rate limiting inteligente y reintentos
      * 
      * @param string $uri URI relativa a VLR.gg
@@ -67,7 +140,6 @@ class VlrScraper implements ScraperInterface
 
                 error_log("VlrScraper: Unexpected status code {$statusCode} for {$uri}");
                 $this->registerFailure();
-
             } catch (\GuzzleHttp\Exception\ClientException $e) {
                 $statusCode = $e->getResponse()->getStatusCode();
                 $this->registerFailure();
@@ -77,7 +149,6 @@ class VlrScraper implements ScraperInterface
                 } else {
                     error_log("VlrScraper: Client error ({$statusCode}) for {$uri}: " . $e->getMessage());
                 }
-
             } catch (Exception $e) {
                 $this->registerFailure();
                 error_log("VlrScraper fetch error for {$uri}: " . $e->getMessage());
@@ -426,27 +497,28 @@ class VlrScraper implements ScraperInterface
     /**
      * Busca un partido en VLR.gg por nombres de equipo
      * Retorna el vlr_match_id si encuentra coincidencia
+     * Usa normalización flexible para comparar nombres con acentos
      */
     public function findMatchByTeams(string $team1, string $team2, ?string $date = null): ?string
     {
-        // Normalizar nombres para comparación
-        $team1 = strtolower(trim($team1));
-        $team2 = strtolower(trim($team2));
+        // Normalizar nombres para comparación (elimina acentos y sufijos)
+        $team1Norm = $this->normalizeForComparison($team1);
+        $team2Norm = $this->normalizeForComparison($team2);
 
         // Buscar en resultados recientes
         $results = $this->scrapeResults();
 
         foreach ($results as $match) {
-            $matchTeam1 = strtolower(trim($match['team1']));
-            $matchTeam2 = strtolower(trim($match['team2']));
+            $matchTeam1Norm = $this->normalizeForComparison($match['team1']);
+            $matchTeam2Norm = $this->normalizeForComparison($match['team2']);
 
-            // Comparación flexible (contiene o igual)
-            $t1Match = ($matchTeam1 === $team1 || str_contains($matchTeam1, $team1) || str_contains($team1, $matchTeam1));
-            $t2Match = ($matchTeam2 === $team2 || str_contains($matchTeam2, $team2) || str_contains($team2, $matchTeam2));
+            // Comparación flexible (contiene o igual) usando texto normalizado
+            $t1Match = ($matchTeam1Norm === $team1Norm || str_contains($matchTeam1Norm, $team1Norm) || str_contains($team1Norm, $matchTeam1Norm));
+            $t2Match = ($matchTeam2Norm === $team2Norm || str_contains($matchTeam2Norm, $team2Norm) || str_contains($team2Norm, $matchTeam2Norm));
 
             // También en orden inverso
-            $t1Inv = ($matchTeam1 === $team2 || str_contains($matchTeam1, $team2) || str_contains($team2, $matchTeam1));
-            $t2Inv = ($matchTeam2 === $team1 || str_contains($matchTeam2, $team1) || str_contains($team1, $matchTeam2));
+            $t1Inv = ($matchTeam1Norm === $team2Norm || str_contains($matchTeam1Norm, $team2Norm) || str_contains($team2Norm, $matchTeam1Norm));
+            $t2Inv = ($matchTeam2Norm === $team1Norm || str_contains($matchTeam2Norm, $team1Norm) || str_contains($team1Norm, $matchTeam2Norm));
 
             if (($t1Match && $t2Match) || ($t1Inv && $t2Inv)) {
                 return $match['vlr_match_id'];
@@ -518,5 +590,176 @@ class VlrScraper implements ScraperInterface
         }
 
         return min($score, 200);
+    }
+
+    /**
+     * Scrape teams from VLR.gg rankings page
+     * This discovers tier 2+ teams that may not appear in main match lists
+     * 
+     * @param string|null $region Optional region filter (europe, north-america, brazil, asia-pacific, korea, china, japan, la-s, la-n, oceania, mena)
+     * @return array List of teams with name, country, vlr_id, rating
+     */
+    public function scrapeRankings(?string $region = null): array
+    {
+        $url = '/rankings';
+        if ($region) {
+            $url .= '/' . $region;
+        }
+
+        $html = $this->fetch($url);
+        if (empty($html)) {
+            return [];
+        }
+
+        $crawler = new Crawler($html);
+        $teams = [];
+
+        // Parse ranking rows - each team is in a ranking item
+        $crawler->filter('.rank-item, .wf-module-item.rank-item, a[href*="/team/"]')->each(function (Crawler $node) use (&$teams) {
+            try {
+                // Get team link
+                $href = $node->attr('href');
+                if (!$href || !str_contains($href, '/team/')) {
+                    // Try to find link inside
+                    $teamLink = $node->filter('a[href*="/team/"]');
+                    if ($teamLink->count()) {
+                        $href = $teamLink->first()->attr('href');
+                    } else {
+                        return;
+                    }
+                }
+
+                // Extract VLR team ID from URL
+                $vlrTeamId = null;
+                if (preg_match('/\/team\/(\d+)\//', $href, $m)) {
+                    $vlrTeamId = $m[1];
+                }
+
+                // Get team name
+                $teamName = '';
+                $nameNode = $node->filter('.rank-item-team-name, .wf-title, .text-of');
+                if ($nameNode->count()) {
+                    $teamName = trim($nameNode->first()->text());
+                } else {
+                    // Try text content
+                    $teamName = trim($node->text());
+                    // Clean up - remove rating numbers
+                    $teamName = preg_replace('/\d{3,4}$/', '', $teamName);
+                    $teamName = preg_replace('/^\d+/', '', $teamName);
+                    $teamName = trim($teamName);
+                }
+
+                // Get country/region
+                $country = '';
+                $countryNode = $node->filter('.rank-item-team-country, .ge-text-light');
+                if ($countryNode->count()) {
+                    $country = trim($countryNode->first()->text());
+                }
+
+                // Get rating
+                $rating = null;
+                $ratingNode = $node->filter('.rank-item-rating, .rating');
+                if ($ratingNode->count()) {
+                    $rating = (int) trim($ratingNode->first()->text());
+                }
+
+                if (!empty($teamName) && $teamName !== 'TBD' && strlen($teamName) > 1) {
+                    // Avoid duplicates
+                    $exists = array_filter($teams, fn($t) => $t['name'] === $teamName);
+                    if (empty($exists)) {
+                        $teams[] = [
+                            'name' => $teamName,
+                            'country' => $country ?: null,
+                            'vlr_team_id' => $vlrTeamId,
+                            'rating' => $rating,
+                            'vlr_url' => $this->baseUrl . $href,
+                            'game_type' => 'valorant',
+                            'region' => $this->detectRegionFromCountry($country)
+                        ];
+                    }
+                }
+            } catch (Exception $e) {
+                // Skip
+            }
+        });
+
+        return $teams;
+    }
+
+    /**
+     * Scrape all teams from multiple VLR.gg ranking regions
+     * Useful for bulk importing tier 2 teams
+     * 
+     * @param array $regions List of regions to scrape, or null for all
+     * @return array All discovered teams
+     */
+    public function scrapeAllRankings(?array $regions = null): array
+    {
+        $allRegions = [
+            'europe',
+            'north-america',
+            'brazil',
+            'asia-pacific',
+            'korea',
+            'china',
+            'japan',
+            'la-s',
+            'la-n',
+            'oceania',
+            'mena'
+        ];
+
+        $regionsToScrape = $regions ?? $allRegions;
+        $allTeams = [];
+
+        foreach ($regionsToScrape as $region) {
+            $teams = $this->scrapeRankings($region);
+
+            foreach ($teams as $team) {
+                // Check for duplicates by name
+                $exists = array_filter(
+                    $allTeams,
+                    fn($t) =>
+                    $this->normalizeForComparison($t['name']) === $this->normalizeForComparison($team['name'])
+                );
+
+                if (empty($exists)) {
+                    $allTeams[] = $team;
+                }
+            }
+
+            // Rate limiting between regions
+            sleep(2);
+        }
+
+        return $allTeams;
+    }
+
+    /**
+     * Detect region from country name
+     */
+    protected function detectRegionFromCountry(string $country): string
+    {
+        $country = strtolower($country);
+
+        // Americas
+        $americas = ['united states', 'canada', 'brazil', 'argentina', 'chile', 'mexico', 'peru', 'colombia', 'uruguay'];
+        foreach ($americas as $c) {
+            if (str_contains($country, $c)) return 'Americas';
+        }
+
+        // Pacific
+        $pacific = ['korea', 'japan', 'china', 'singapore', 'indonesia', 'thailand', 'vietnam', 'philippines', 'india', 'taiwan', 'hong kong', 'malaysia', 'australia'];
+        foreach ($pacific as $c) {
+            if (str_contains($country, $c)) return 'Pacific';
+        }
+
+        // EMEA
+        $emea = ['europe', 'germany', 'france', 'spain', 'united kingdom', 'turkey', 'russia', 'poland', 'sweden', 'denmark', 'finland', 'norway', 'italy', 'netherlands', 'portugal', 'czech', 'ukraine', 'israel', 'saudi', 'uae', 'morocco', 'egypt'];
+        foreach ($emea as $c) {
+            if (str_contains($country, $c)) return 'EMEA';
+        }
+
+        return 'Other';
     }
 }

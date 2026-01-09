@@ -82,8 +82,9 @@ class TeamScraper
      */
     protected function normalizeTeamName(string $teamName): string
     {
-        // Common team name corrections
+        // Common team name corrections (including LATAM teams with special chars)
         $corrections = [
+            // International orgs
             'FNATIC' => 'Fnatic',
             'fnatic' => 'Fnatic',
             'NAVI' => 'Natus_Vincere',
@@ -99,6 +100,45 @@ class TeamScraper
             'GEN' => 'Gen.G',
             'GEN.G' => 'Gen.G',
             'GENG' => 'Gen.G',
+
+            // LATAM teams with special characters
+            'KRU' => 'KRÜ_Esports',
+            'KRÜ' => 'KRÜ_Esports',
+            'KRU ESPORTS' => 'KRÜ_Esports',
+            'KRÜ ESPORTS' => 'KRÜ_Esports',
+            'LEVIATAN' => 'Leviatán',
+            'LEVIATÁN' => 'Leviatán',
+            'LEV' => 'Leviatán',
+            'FURIA' => 'FURIA_Esports',
+            'FUR' => 'FURIA_Esports',
+            'MIBR' => 'MIBR',
+
+            // NA teams
+            'SENTINELS' => 'Sentinels',
+            'SEN' => 'Sentinels',
+            '100T' => '100_Thieves',
+            '100 THIEVES' => '100_Thieves',
+            'NRG' => 'NRG',
+            'EG' => 'Evil_Geniuses',
+            'EVIL GENIUSES' => 'Evil_Geniuses',
+
+            // EMEA teams
+            'FNC' => 'Fnatic',
+            'VITALITY' => 'Team_Vitality',
+            'VIT' => 'Team_Vitality',
+            'KC' => 'Karmine_Corp',
+            'KARMINE' => 'Karmine_Corp',
+            'TH' => 'Team_Heretics',
+            'HERETICS' => 'Team_Heretics',
+
+            // Pacific teams
+            'PRX' => 'Paper_Rex',
+            'PAPER REX' => 'Paper_Rex',
+            'GEN' => 'Gen.G',
+            'EDG' => 'EDward_Gaming',
+            'EDWARD GAMING' => 'EDward_Gaming',
+            'RRQ' => 'Rex_Regum_Qeon',
+            'BLG' => 'Bilibili_Gaming',
         ];
 
         // Check for known corrections first
@@ -720,7 +760,6 @@ class TeamScraper
                     ];
                 }
             });
-
         } catch (Exception $e) {
             error_log("TeamScraper list fetch error: " . $e->getMessage());
         }

@@ -29,6 +29,103 @@ class TeamModel
     }
 
     /**
+     * Normalize text for search (remove accents)
+     * Used to create search variants for flexible matching
+     */
+    protected function normalizeForSearch(string $text): string
+    {
+        $accentMap = [
+            'á' => 'a',
+            'à' => 'a',
+            'ä' => 'a',
+            'â' => 'a',
+            'ã' => 'a',
+            'é' => 'e',
+            'è' => 'e',
+            'ë' => 'e',
+            'ê' => 'e',
+            'í' => 'i',
+            'ì' => 'i',
+            'ï' => 'i',
+            'î' => 'i',
+            'ó' => 'o',
+            'ò' => 'o',
+            'ö' => 'o',
+            'ô' => 'o',
+            'õ' => 'o',
+            'ú' => 'u',
+            'ù' => 'u',
+            'ü' => 'u',
+            'û' => 'u',
+            'ñ' => 'n',
+            'ç' => 'c',
+            'Á' => 'A',
+            'À' => 'A',
+            'Ä' => 'A',
+            'Â' => 'A',
+            'Ã' => 'A',
+            'É' => 'E',
+            'È' => 'E',
+            'Ë' => 'E',
+            'Ê' => 'E',
+            'Í' => 'I',
+            'Ì' => 'I',
+            'Ï' => 'I',
+            'Î' => 'I',
+            'Ó' => 'O',
+            'Ò' => 'O',
+            'Ö' => 'O',
+            'Ô' => 'O',
+            'Õ' => 'O',
+            'Ú' => 'U',
+            'Ù' => 'U',
+            'Ü' => 'U',
+            'Û' => 'U',
+            'Ñ' => 'N',
+            'Ç' => 'C',
+        ];
+
+        return strtr($text, $accentMap);
+    }
+
+    /**
+     * Get search variants for a term (original + normalized)
+     */
+    protected function getSearchVariants(string $search): array
+    {
+        $variants = [$search];
+        $normalized = $this->normalizeForSearch($search);
+
+        if ($normalized !== $search) {
+            $variants[] = $normalized;
+        }
+
+        // Also add common team name mappings
+        $mappings = [
+            'kru' => ['krü', 'kru esports', 'krü esports'],
+            'leviatan' => ['leviatán', 'lev'],
+            'furia' => ['furia esports', 'fur'],
+            'sentinels' => ['sen'],
+            'fnatic' => ['fnc'],
+            'g2' => ['g2 esports'],
+        ];
+
+        $searchLower = strtolower($search);
+        if (isset($mappings[$searchLower])) {
+            $variants = array_merge($variants, $mappings[$searchLower]);
+        }
+
+        // Check reverse mappings
+        foreach ($mappings as $main => $aliases) {
+            if (in_array($searchLower, $aliases)) {
+                $variants[] = $main;
+            }
+        }
+
+        return array_unique($variants);
+    }
+
+    /**
      * Get all teams, optionally filtered by game type
      */
     public function getAllTeams(?string $gameType = null, ?string $region = null, ?string $search = null, int $limit = 1000, int $offset = 0): array
@@ -51,8 +148,17 @@ class TeamModel
         }
 
         if ($search) {
-            $sql .= " AND name LIKE :search";
-            $params['search'] = '%' . $search . '%';
+            // Get search variants (original + normalized + known aliases)
+            $variants = $this->getSearchVariants($search);
+            $searchConditions = [];
+
+            foreach ($variants as $i => $variant) {
+                $paramName = "search_$i";
+                $searchConditions[] = "name LIKE :$paramName";
+                $params[$paramName] = '%' . $variant . '%';
+            }
+
+            $sql .= " AND (" . implode(" OR ", $searchConditions) . ")";
         }
 
         $sql .= " ORDER BY name ASC LIMIT :limit OFFSET :offset";
@@ -88,8 +194,17 @@ class TeamModel
         }
 
         if ($search) {
-            $sql .= " AND name LIKE :search";
-            $params['search'] = '%' . $search . '%';
+            // Get search variants (original + normalized + known aliases)
+            $variants = $this->getSearchVariants($search);
+            $searchConditions = [];
+
+            foreach ($variants as $i => $variant) {
+                $paramName = "search_$i";
+                $searchConditions[] = "name LIKE :$paramName";
+                $params[$paramName] = '%' . $variant . '%';
+            }
+
+            $sql .= " AND (" . implode(" OR ", $searchConditions) . ")";
         }
 
         $stmt = $this->db->prepare($sql);
