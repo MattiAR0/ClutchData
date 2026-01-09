@@ -57,6 +57,39 @@ class PlayerController
                 $offset
             );
 
+            // SEARCH DISCOVERY LOGIC
+            if ($search && ($totalPlayers < 5)) {
+                try {
+                    $scraper = new \App\Classes\PlayerScraper();
+                    $normalizedSearch = ucfirst(trim($search));
+
+                    $gamesToScrape = ($activeTab !== 'all') ? [$activeTab] : ['valorant', 'cs2', 'lol'];
+                    $foundNew = false;
+
+                    foreach ($gamesToScrape as $gType) {
+                        $newPlayers = $scraper->scrapePlayerList($gType, $normalizedSearch);
+
+                        if (!empty($newPlayers)) {
+                            foreach ($newPlayers as $playerData) {
+                                $existing = $this->playerModel->getPlayerByNickname($playerData['nickname'], $gType);
+                                if (!$existing) {
+                                    $this->playerModel->savePlayer($playerData);
+                                    $foundNew = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($foundNew) {
+                        $totalPlayers = $this->playerModel->getTotalCount($activeTab !== 'all' ? $activeTab : null, null, $search);
+                        $players = $this->playerModel->getAllPlayers($activeTab !== 'all' ? $activeTab : null, null, $search, $limit, $offset);
+                    }
+
+                } catch (Exception $e) {
+                    error_log("Search discovery failed: " . $e->getMessage());
+                }
+            }
+
             $totalPages = ceil($totalPlayers / $limit);
 
             // LAZY SCRAPING LOGIC

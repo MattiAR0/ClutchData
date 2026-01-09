@@ -16,7 +16,7 @@ class GeminiPredictor
 {
     private string $apiKey;
     private ?MonologLogger $logger;
-    private const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
+    private const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     private const RATE_LIMIT_DELAY = 1; // segundos entre llamadas
     private const API_TIMEOUT = 60; // segundos de timeout (aumentado para priorizar IA)
     private const MAX_RETRIES = 2; // reintentos si falla

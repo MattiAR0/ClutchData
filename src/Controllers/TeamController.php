@@ -61,6 +61,48 @@ class TeamController
                 $offset
             );
 
+            // SEARCH DISCOVERY LOGIC
+            // If user is searching and we found very few results locally, try to discover more from Liquipedia
+            // We do this if we are on a specific game, OR if we are on 'all' (we check all games)
+            if ($search && ($totalTeams < 5)) {
+                try {
+                    $scraper = new \App\Classes\TeamScraper();
+                    // Normalize search term for Liquipedia (Capitalize first letter usually works best)
+                    $normalizedSearch = ucfirst(trim($search));
+
+                    // Determine which games to scrape
+                    $gamesToScrape = ($gameType !== 'all') ? [$gameType] : ['valorant', 'cs2', 'lol'];
+                    $foundNew = false;
+
+                    foreach ($gamesToScrape as $gType) {
+                        // scrapeTeamList with startFrom = normalized search term
+                        // We disable limit implicitly by using scrapeTeamList which fetches one batch
+                        $newTeams = $scraper->scrapeTeamList($gType, $normalizedSearch);
+
+                        if (!empty($newTeams)) {
+                            foreach ($newTeams as $teamData) {
+                                // Only save if it doesn't exist to avoid overwriting full data with minimal list data
+                                $existing = $this->teamModel->getTeamByNameAndGame($teamData['name'], $gType);
+                                if (!$existing) {
+                                    $this->teamModel->saveTeam($teamData);
+                                    $foundNew = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($foundNew) {
+                        // Re-fetch counts and teams
+                        $totalTeams = $this->teamModel->getTotalCount($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null, $search);
+                        $teams = $this->teamModel->getAllTeams($gameType !== 'all' ? $gameType : null, $activeRegion !== 'all' ? $activeRegion : null, $search, $limit, $offset);
+                    }
+
+                } catch (Exception $e) {
+                    // Silently fail search discovery to not break the page
+                    error_log("Search discovery failed: " . $e->getMessage());
+                }
+            }
+
             // Calculate total pages
             $totalPages = ceil($totalTeams / $limit);
 
