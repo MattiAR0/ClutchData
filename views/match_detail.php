@@ -224,19 +224,19 @@
             </div>
 
             <?php if ($match['needs_async_ai'] ?? false): ?>
-            <script>
-            (function() {
-                const matchId = <?= (int)$match['id'] ?>;
-                const container = document.getElementById('ai-explanation-container');
-                const badge = document.querySelector('.flex.justify-center.mb-4');
-                
-                fetch('/ClutchData/public/api/ai_prediction.php?match_id=' + matchId)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.source === 'gemini' && data.explanation) {
-                            // Update badge to Gemini
-                            if (badge) {
-                                badge.innerHTML = `
+                <script>
+                    (function() {
+                        const matchId = <?= (int)$match['id'] ?>;
+                        const container = document.getElementById('ai-explanation-container');
+                        const badge = document.querySelector('.flex.justify-center.mb-4');
+
+                        fetch('/ClutchData/public/api/ai_prediction.php?match_id=' + matchId)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.source === 'gemini' && data.explanation) {
+                                    // Update badge to Gemini
+                                    if (badge) {
+                                        badge.innerHTML = `
                                     <span class="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-[10px] text-blue-400 font-bold uppercase tracking-widest backdrop-blur-sm shadow-lg">
                                         <svg class="w-3 h-3 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
@@ -244,10 +244,10 @@
                                         Gemini AI
                                     </span>
                                 `;
-                            }
-                            
-                            // Update explanation
-                            container.innerHTML = `
+                                    }
+
+                                    // Update explanation
+                                    container.innerHTML = `
                                 <div class="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700/50">
                                     <p class="text-sm text-zinc-300 leading-relaxed">
                                         <svg class="w-4 h-4 inline-block mr-1 text-blue-400 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -257,37 +257,37 @@
                                     </p>
                                 </div>
                             `;
-                            
-                            // Update prediction bars
-                            const prediction = data.prediction;
-                            const team1Bar = document.querySelector('[style*="width:"][class*="from-indigo"]');
-                            const team2Bar = document.querySelector('[style*="width:"][class*="from-rose"]');
-                            const team1Pct = document.querySelector('.text-indigo-500.text-4xl');
-                            const team2Pct = document.querySelector('.text-rose-500.text-4xl');
-                            
-                            if (team1Bar) team1Bar.style.width = prediction + '%';
-                            if (team2Bar) team2Bar.style.width = (100 - prediction) + '%';
-                            if (team1Pct) team1Pct.textContent = prediction.toFixed(1) + '%';
-                            if (team2Pct) team2Pct.textContent = (100 - prediction).toFixed(1) + '%';
-                        } else {
-                            // Show ELO fallback message
-                            container.innerHTML = `
+
+                                    // Update prediction bars
+                                    const prediction = data.prediction;
+                                    const team1Bar = document.querySelector('[style*="width:"][class*="from-indigo"]');
+                                    const team2Bar = document.querySelector('[style*="width:"][class*="from-rose"]');
+                                    const team1Pct = document.querySelector('.text-indigo-500.text-4xl');
+                                    const team2Pct = document.querySelector('.text-rose-500.text-4xl');
+
+                                    if (team1Bar) team1Bar.style.width = prediction + '%';
+                                    if (team2Bar) team2Bar.style.width = (100 - prediction) + '%';
+                                    if (team1Pct) team1Pct.textContent = prediction.toFixed(1) + '%';
+                                    if (team2Pct) team2Pct.textContent = (100 - prediction).toFixed(1) + '%';
+                                } else {
+                                    // Show ELO fallback message
+                                    container.innerHTML = `
                                 <p class="text-[10px] text-zinc-600 font-mono">
                                     Basado en rating ELO y estadísticas históricas
                                 </p>
                             `;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('AI prediction error:', error);
-                        container.innerHTML = `
+                                }
+                            })
+                            .catch(error => {
+                                console.error('AI prediction error:', error);
+                                container.innerHTML = `
                             <p class="text-[10px] text-zinc-600 font-mono">
                                 Basado en rating ELO y estadísticas históricas
                             </p>
                         `;
-                    });
-            })();
-            </script>
+                            });
+                    })();
+                </script>
             <?php endif; ?>
 
             <!-- Details List -->
@@ -318,24 +318,27 @@
 
             <!-- Detailed Stats / Maps -->
             <?php if (!empty($match['details_decoded']['maps'])): ?>
-                <div class="mb-12">
+                <div class="mb-12" id="map-breakdown-section">
                     <div class="flex items-center gap-4 mb-8">
                         <div class="h-px bg-zinc-800 flex-grow"></div>
                         <h3 class="text-lg font-bold text-white uppercase tracking-[0.2em]">Map Breakdown</h3>
                         <div class="h-px bg-zinc-800 flex-grow"></div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="map-breakdown-grid">
                         <?php foreach ($match['details_decoded']['maps'] as $index => $map): ?>
-                            <div
-                                class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 flex flex-col items-center justify-center relative overflow-hidden group hover:border-zinc-700 transition-colors">
+                            <button
+                                type="button"
+                                data-map-name="<?= htmlspecialchars($map['name']) ?>"
+                                onclick="selectMap('<?= htmlspecialchars(addslashes($map['name'])) ?>')"
+                                class="map-card bg-zinc-900 border border-zinc-800 rounded-lg p-5 flex flex-col items-center justify-center relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
                                 <div
-                                    class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity map-card-bg">
                                 </div>
                                 <span class="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Map
                                     <?= $index + 1 ?></span>
                                 <span
-                                    class="font-black text-white font-mono text-2xl mb-4 tracking-tight"><?= htmlspecialchars($map['name']) ?></span>
+                                    class="font-black text-white font-mono text-2xl mb-4 tracking-tight map-card-name"><?= htmlspecialchars($map['name']) ?></span>
 
                                 <div
                                     class="flex items-center gap-6 bg-zinc-950/50 px-6 py-2 rounded-full border border-zinc-800/50">
@@ -349,9 +352,26 @@
                                         <?= htmlspecialchars($map['score2']) ?>
                                     </span>
                                 </div>
-                            </div>
+
+                                <!-- Selection indicator -->
+                                <div class="map-selected-indicator hidden absolute top-2 right-2">
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </span>
+                                </div>
+                            </button>
                         <?php endforeach; ?>
                     </div>
+
+                    <!-- Hint text -->
+                    <p class="text-center text-zinc-600 text-xs mt-4">
+                        <svg class="w-3 h-3 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Click a map to view player statistics for that specific map
+                    </p>
                 </div>
             <?php endif; ?>
 
@@ -377,7 +397,7 @@
                     }
                 }
                 $hasAdvancedStats = $hasVlrData || $hasHltvData;
-                ?>
+            ?>
                 <div class="mb-16">
                     <div class="flex items-center gap-4 mb-8">
                         <div class="h-px bg-zinc-800 flex-grow"></div>
@@ -416,135 +436,393 @@
                         <?php endif; ?>
                     </div>
 
-                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                        <?php
-                        $teams = [
-                            ['name' => $match['team1_name'], 'players' => $match['merged_stats'][$match['team1_name']] ?? [], 'color' => 'indigo'],
-                            ['name' => $match['team2_name'], 'players' => $match['merged_stats'][$match['team2_name']] ?? [], 'color' => 'rose']
-                        ];
+                    <!-- Map Filter Tabs -->
+                    <?php if (!empty($match['details_decoded']['maps'])): ?>
+                        <div class="flex flex-wrap justify-center gap-2 mb-6" id="map-tabs-container">
+                            <button
+                                type="button"
+                                data-map="overall"
+                                onclick="selectMap('overall')"
+                                class="map-tab map-tab-active px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded-lg transition-all bg-indigo-600 text-white border-indigo-500">
+                                <svg class="w-3 h-3 inline-block mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                </svg>
+                                All Maps
+                            </button>
+                            <?php foreach ($match['details_decoded']['maps'] as $map): ?>
+                                <button
+                                    type="button"
+                                    data-map="<?= htmlspecialchars($map['name']) ?>"
+                                    onclick="selectMap('<?= htmlspecialchars(addslashes($map['name'])) ?>')"
+                                    class="map-tab px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded-lg transition-all bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700 hover:text-white">
+                                    <?= htmlspecialchars($map['name']) ?>
+                                </button>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
 
-                        foreach ($teams as $team):
-                            if (empty($team['players']))
-                                continue;
+                    <!-- Current Map Display -->
+                    <div class="text-center mb-4" id="current-map-label">
+                        <span class="text-sm text-zinc-500">Showing: </span>
+                        <span class="text-sm font-bold text-white" id="current-map-name">All Maps (Overall)</span>
+                    </div>
+
+                    <!-- Stats Container (dynamic content) -->
+                    <div id="player-stats-container">
+                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8" id="player-stats-grid">
+                            <?php
+                            $teams = [
+                                ['name' => $match['team1_name'], 'players' => $match['merged_stats'][$match['team1_name']] ?? [], 'color' => 'indigo'],
+                                ['name' => $match['team2_name'], 'players' => $match['merged_stats'][$match['team2_name']] ?? [], 'color' => 'rose']
+                            ];
+
+                            foreach ($teams as $team):
+                                if (empty($team['players']))
+                                    continue;
                             ?>
-                            <div
-                                class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
-                                <!-- Team Header -->
                                 <div
-                                    class="px-6 py-4 bg-gradient-to-r from-<?= $team['color'] ?>-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
-                                    <h4 class="text-lg font-black text-white italic tracking-wide">
-                                        <?= htmlspecialchars($team['name']) ?>
-                                    </h4>
-                                    <span class="text-xs font-mono text-zinc-500 uppercase">
-                                        <?= count($team['players']) ?> Players
-                                    </span>
-                                </div>
+                                    class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+                                    <!-- Team Header -->
+                                    <div
+                                        class="px-6 py-4 bg-gradient-to-r from-<?= $team['color'] ?>-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
+                                        <h4 class="text-lg font-black text-white italic tracking-wide">
+                                            <?= htmlspecialchars($team['name']) ?>
+                                        </h4>
+                                        <span class="text-xs font-mono text-zinc-500 uppercase">
+                                            <?= count($team['players']) ?> Players
+                                        </span>
+                                    </div>
 
-                                <!-- Table -->
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-left">
-                                        <thead>
-                                            <tr class="border-b border-zinc-800 bg-zinc-900/80">
-                                                <th
-                                                    class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                                                    Player</th>
-                                                <?php if ($hasHltvData): ?>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
-                                                        title="HLTV Rating 2.0">Rating</th>
-                                                <?php elseif ($hasVlrData): ?>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
-                                                        title="Average Combat Score">ACS</th>
-                                                <?php endif; ?>
-                                                <th
-                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
-                                                    K</th>
-                                                <th
-                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
-                                                    D</th>
-                                                <th
-                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
-                                                    A</th>
-                                                <th
-                                                    class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
-                                                    K/D</th>
-                                                <?php if ($hasAdvancedStats): ?>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
-                                                        title="Average Damage per Round">ADR</th>
-                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
-                                                        title="Kill/Assist/Survive/Trade %">KAST</th>
-                                                <?php endif; ?>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-zinc-800/50">
-                                            <?php foreach ($team['players'] as $player): ?>
-                                                <?php
-                                                $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
-                                                $kdColor = $kd >= 1.0 ? 'text-emerald-400' : 'text-rose-400';
-                                                if ($player['kills'] == 0 && $player['deaths'] == 0)
-                                                    $kdColor = 'text-zinc-500';
-
-                                                // Rating color (for HLTV)
-                                                $rating = $player['rating'] ?? null;
-                                                $ratingColor = $rating !== null ? ($rating >= 1.10 ? 'text-emerald-400' : ($rating >= 1.0 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
-
-                                                // ACS color (for VLR)
-                                                $acs = $player['acs'] ?? null;
-                                                $acsColor = $acs !== null ? ($acs >= 250 ? 'text-emerald-400' : ($acs >= 200 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
-
-                                                $kast = $player['kast'] ?? null;
-                                                $kastColor = $kast !== null ? ($kast >= 75 ? 'text-emerald-400' : ($kast >= 60 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
-
-                                                ?>
-                                                <tr class="group hover:bg-white/[0.02] transition-colors">
-                                                    <td class="px-4 py-3">
-                                                        <div class="flex items-center gap-2">
-                                                            <?php if (!empty($player['agent'])): ?>
-                                                                <span
-                                                                    class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded"><?= htmlspecialchars($player['agent']) ?></span>
-                                                            <?php endif; ?>
-                                                            <span
-                                                                class="font-bold text-zinc-200 text-sm"><?= htmlspecialchars($player['name']) ?></span>
-                                                        </div>
-                                                    </td>
+                                    <!-- Table -->
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left">
+                                            <thead>
+                                                <tr class="border-b border-zinc-800 bg-zinc-900/80">
+                                                    <th
+                                                        class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                        Player</th>
                                                     <?php if ($hasHltvData): ?>
-                                                        <td
-                                                            class="px-3 py-3 text-center font-mono text-sm font-bold <?= $ratingColor ?>">
-                                                            <?= $rating !== null ? number_format($rating, 2) : '-' ?>
-                                                        </td>
+                                                        <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                            title="HLTV Rating 2.0">Rating</th>
                                                     <?php elseif ($hasVlrData): ?>
-                                                        <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $acsColor ?>">
-                                                            <?= $acs !== null ? $acs : '-' ?>
-                                                        </td>
+                                                        <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                            title="Average Combat Score">ACS</th>
                                                     <?php endif; ?>
-                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300 font-medium">
-                                                        <?= htmlspecialchars($player['kills'] ?? 0) ?>
-                                                    </td>
-                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">
-                                                        <?= htmlspecialchars($player['deaths'] ?? 0) ?>
-                                                    </td>
-                                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">
-                                                        <?= htmlspecialchars($player['assists'] ?? 0) ?>
-                                                    </td>
-                                                    <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $kdColor ?>">
-                                                        <?= number_format($kd, 2) ?>
-                                                    </td>
+                                                    <th
+                                                        class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                        K</th>
+                                                    <th
+                                                        class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                        D</th>
+                                                    <th
+                                                        class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                        A</th>
+                                                    <th
+                                                        class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">
+                                                        K/D</th>
                                                     <?php if ($hasAdvancedStats): ?>
-                                                        <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">
-                                                            <?= $player['adr'] !== null ? number_format($player['adr'], 1) : '-' ?>
-                                                        </td>
-                                                        <td class="px-3 py-3 text-center font-mono text-sm <?= $kastColor ?>">
-                                                            <?= $kast !== null ? number_format($kast, 1) . '%' : '-' ?>
-                                                        </td>
+                                                        <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                            title="Average Damage per Round">ADR</th>
+                                                        <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center"
+                                                            title="Kill/Assist/Survive/Trade %">KAST</th>
                                                     <?php endif; ?>
                                                 </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody class="divide-y divide-zinc-800/50">
+                                                <?php foreach ($team['players'] as $player): ?>
+                                                    <?php
+                                                    $kd = $player['deaths'] > 0 ? $player['kills'] / $player['deaths'] : $player['kills'];
+                                                    $kdColor = $kd >= 1.0 ? 'text-emerald-400' : 'text-rose-400';
+                                                    if ($player['kills'] == 0 && $player['deaths'] == 0)
+                                                        $kdColor = 'text-zinc-500';
+
+                                                    // Rating color (for HLTV)
+                                                    $rating = $player['rating'] ?? null;
+                                                    $ratingColor = $rating !== null ? ($rating >= 1.10 ? 'text-emerald-400' : ($rating >= 1.0 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                                                    // ACS color (for VLR)
+                                                    $acs = $player['acs'] ?? null;
+                                                    $acsColor = $acs !== null ? ($acs >= 250 ? 'text-emerald-400' : ($acs >= 200 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                                                    $kast = $player['kast'] ?? null;
+                                                    $kastColor = $kast !== null ? ($kast >= 75 ? 'text-emerald-400' : ($kast >= 60 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                                                    ?>
+                                                    <tr class="group hover:bg-white/[0.02] transition-colors">
+                                                        <td class="px-4 py-3">
+                                                            <div class="flex items-center gap-2">
+                                                                <?php if (!empty($player['agent'])): ?>
+                                                                    <span
+                                                                        class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded"><?= htmlspecialchars($player['agent']) ?></span>
+                                                                <?php endif; ?>
+                                                                <span
+                                                                    class="font-bold text-zinc-200 text-sm"><?= htmlspecialchars($player['name']) ?></span>
+                                                            </div>
+                                                        </td>
+                                                        <?php if ($hasHltvData): ?>
+                                                            <td
+                                                                class="px-3 py-3 text-center font-mono text-sm font-bold <?= $ratingColor ?>">
+                                                                <?= $rating !== null ? number_format($rating, 2) : '-' ?>
+                                                            </td>
+                                                        <?php elseif ($hasVlrData): ?>
+                                                            <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $acsColor ?>">
+                                                                <?= $acs !== null ? $acs : '-' ?>
+                                                            </td>
+                                                        <?php endif; ?>
+                                                        <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300 font-medium">
+                                                            <?= htmlspecialchars($player['kills'] ?? 0) ?>
+                                                        </td>
+                                                        <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">
+                                                            <?= htmlspecialchars($player['deaths'] ?? 0) ?>
+                                                        </td>
+                                                        <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">
+                                                            <?= htmlspecialchars($player['assists'] ?? 0) ?>
+                                                        </td>
+                                                        <td class="px-3 py-3 text-center font-mono text-sm font-bold <?= $kdColor ?>">
+                                                            <?= number_format($kd, 2) ?>
+                                                        </td>
+                                                        <?php if ($hasAdvancedStats): ?>
+                                                            <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">
+                                                                <?= $player['adr'] !== null ? number_format($player['adr'], 1) : '-' ?>
+                                                            </td>
+                                                            <td class="px-3 py-3 text-center font-mono text-sm <?= $kastColor ?>">
+                                                                <?= $kast !== null ? number_format($kast, 1) . '%' : '-' ?>
+                                                            </td>
+                                                        <?php endif; ?>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div><!-- /player-stats-container -->
                 </div>
+
+                <!-- Map Selection JavaScript -->
+                <script>
+                    (function() {
+                        const matchId = <?= (int)$match['id'] ?>;
+                        const gameType = '<?= htmlspecialchars($match['game_type']) ?>';
+                        const team1Name = '<?= htmlspecialchars(addslashes($match['team1_name'])) ?>';
+                        const team2Name = '<?= htmlspecialchars(addslashes($match['team2_name'])) ?>';
+                        const hasVlrData = <?= $hasVlrData ? 'true' : 'false' ?>;
+                        const hasHltvData = <?= $hasHltvData ? 'true' : 'false' ?>;
+
+                        let currentMap = 'overall';
+                        let isLoading = false;
+
+                        // Expose selectMap to global scope for onclick handlers
+                        window.selectMap = function(mapName) {
+                            if (isLoading || mapName === currentMap) return;
+
+                            currentMap = mapName;
+                            isLoading = true;
+
+                            // Update visual state
+                            updateMapSelection(mapName);
+
+                            // Update current map label
+                            const labelEl = document.getElementById('current-map-name');
+                            if (labelEl) {
+                                labelEl.textContent = mapName === 'overall' ? 'All Maps (Overall)' : mapName;
+                            }
+
+                            // Show loading state
+                            const container = document.getElementById('player-stats-container');
+                            if (container) {
+                                container.innerHTML = `
+                                <div class="text-center py-12">
+                                    <div class="inline-flex flex-col items-center gap-4">
+                                        <div class="w-10 h-10 border-4 border-zinc-700 border-t-indigo-500 rounded-full animate-spin"></div>
+                                        <p class="text-zinc-500 text-sm font-mono">Loading ${mapName === 'overall' ? 'overall' : mapName} stats...</p>
+                                    </div>
+                                </div>
+                            `;
+                            }
+
+                            // Fetch stats for the selected map
+                            fetch(`./api/match/stats?id=${matchId}&map=${encodeURIComponent(mapName)}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    isLoading = false;
+                                    if (data.success && data.stats) {
+                                        renderStats(data.stats, data.source || (hasVlrData ? 'vlr' : (hasHltvData ? 'hltv' : 'liquipedia')));
+                                    } else {
+                                        showNoStats();
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error loading map stats:', error);
+                                    isLoading = false;
+                                    showError();
+                                });
+                        };
+
+                        function updateMapSelection(mapName) {
+                            // Update map breakdown cards
+                            document.querySelectorAll('.map-card').forEach(card => {
+                                const cardMap = card.dataset.mapName;
+                                const indicator = card.querySelector('.map-selected-indicator');
+
+                                if (cardMap === mapName) {
+                                    card.classList.add('border-indigo-500', 'ring-2', 'ring-indigo-500/30');
+                                    card.classList.remove('border-zinc-800');
+                                    if (indicator) indicator.classList.remove('hidden');
+                                } else {
+                                    card.classList.remove('border-indigo-500', 'ring-2', 'ring-indigo-500/30');
+                                    card.classList.add('border-zinc-800');
+                                    if (indicator) indicator.classList.add('hidden');
+                                }
+                            });
+
+                            // Update map tabs
+                            document.querySelectorAll('.map-tab').forEach(tab => {
+                                const tabMap = tab.dataset.map;
+
+                                if (tabMap === mapName) {
+                                    tab.classList.add('bg-indigo-600', 'text-white', 'border-indigo-500');
+                                    tab.classList.remove('bg-zinc-800/50', 'text-zinc-400', 'border-zinc-700');
+                                } else {
+                                    tab.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-500');
+                                    tab.classList.add('bg-zinc-800/50', 'text-zinc-400', 'border-zinc-700');
+                                }
+                            });
+                        }
+
+                        function renderStats(stats, source) {
+                            const container = document.getElementById('player-stats-container');
+                            if (!container) return;
+
+                            const hasAdvanced = source === 'vlr' || source === 'hltv';
+                            const isHltv = source === 'hltv';
+
+                            const teams = [{
+                                    name: team1Name,
+                                    players: stats.team1 || [],
+                                    color: 'indigo'
+                                },
+                                {
+                                    name: team2Name,
+                                    players: stats.team2 || [],
+                                    color: 'rose'
+                                }
+                            ];
+
+                            let html = '<div class="grid grid-cols-1 xl:grid-cols-2 gap-8">';
+
+                            teams.forEach(team => {
+                                if (!team.players || team.players.length === 0) return;
+
+                                html += `
+                                <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/5">
+                                    <div class="px-6 py-4 bg-gradient-to-r from-${team.color}-500/10 to-transparent border-b border-zinc-800 flex items-center justify-between">
+                                        <h4 class="text-lg font-black text-white italic tracking-wide">${escapeHtml(team.name)}</h4>
+                                        <span class="text-xs font-mono text-zinc-500 uppercase">${team.players.length} Players</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left">
+                                            <thead>
+                                                <tr class="border-b border-zinc-800 bg-zinc-900/80">
+                                                    <th class="px-4 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Player</th>
+                                                    ${isHltv ? '<th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">Rating</th>'
+                                                    : hasAdvanced ? '<th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">ACS</th>' : ''}
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">K</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">D</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">A</th>
+                                                    <th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">K/D</th>
+                                                    ${hasAdvanced ? '<th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">ADR</th><th class="px-3 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">KAST</th>' : ''}
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-zinc-800/50">
+                                                ${team.players.map(p => renderPlayerRow(p, hasAdvanced, isHltv)).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            `;
+                            });
+
+                            html += '</div>';
+                            container.innerHTML = html;
+                        }
+
+                        function renderPlayerRow(player, hasAdvanced, isHltv) {
+                            const kills = player.kills || 0;
+                            const deaths = player.deaths || 0;
+                            const kd = deaths > 0 ? kills / deaths : kills;
+                            const kdColor = kd >= 1.0 ? 'text-emerald-400' : 'text-rose-400';
+
+                            const rating = player.rating;
+                            const ratingColor = rating !== null ? (rating >= 1.10 ? 'text-emerald-400' : (rating >= 1.0 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                            const acs = player.acs;
+                            const acsColor = acs !== null ? (acs >= 250 ? 'text-emerald-400' : (acs >= 200 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                            const kast = player.kast;
+                            const kastColor = kast !== null ? (kast >= 75 ? 'text-emerald-400' : (kast >= 60 ? 'text-yellow-400' : 'text-zinc-400')) : 'text-zinc-600';
+
+                            const playerName = player.player_name || player.name || 'Unknown';
+                            const agent = player.agent;
+
+                            return `
+                            <tr class="group hover:bg-white/[0.02] transition-colors">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        ${agent ? `<span class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">${escapeHtml(agent)}</span>` : ''}
+                                        <span class="font-bold text-zinc-200 text-sm">${escapeHtml(playerName)}</span>
+                                    </div>
+                                </td>
+                                ${isHltv ? `<td class="px-3 py-3 text-center font-mono text-sm font-bold ${ratingColor}">${rating !== null ? rating.toFixed(2) : '-'}</td>`
+                                : hasAdvanced ? `<td class="px-3 py-3 text-center font-mono text-sm font-bold ${acsColor}">${acs !== null ? acs : '-'}</td>` : ''}
+                                <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300 font-medium">${kills}</td>
+                                <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">${deaths}</td>
+                                <td class="px-3 py-3 text-center font-mono text-sm text-zinc-400">${player.assists || 0}</td>
+                                <td class="px-3 py-3 text-center font-mono text-sm font-bold ${kdColor}">${kd.toFixed(2)}</td>
+                                ${hasAdvanced ? `
+                                    <td class="px-3 py-3 text-center font-mono text-sm text-zinc-300">${player.adr !== null ? player.adr.toFixed(1) : '-'}</td>
+                                    <td class="px-3 py-3 text-center font-mono text-sm ${kastColor}">${kast !== null ? kast.toFixed(1) + '%' : '-'}</td>
+                                ` : ''}
+                            </tr>
+                        `;
+                        }
+
+                        function showNoStats() {
+                            const container = document.getElementById('player-stats-container');
+                            if (container) {
+                                container.innerHTML = `
+                                <div class="text-center py-12 text-zinc-500">
+                                    <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <p class="text-sm">No statistics available for this map.</p>
+                                    <button onclick="selectMap('overall')" class="mt-4 text-indigo-400 hover:text-indigo-300 text-sm underline">
+                                        View All Maps
+                                    </button>
+                                </div>
+                            `;
+                            }
+                        }
+
+                        function showError() {
+                            const container = document.getElementById('player-stats-container');
+                            if (container) {
+                                container.innerHTML = `
+                                <div class="text-center py-12 text-zinc-500">
+                                    <p class="text-sm">Failed to load statistics. Please try again.</p>
+                                </div>
+                            `;
+                            }
+                        }
+
+                        function escapeHtml(text) {
+                            const div = document.createElement('div');
+                            div.textContent = text;
+                            return div.innerHTML;
+                        }
+                    })();
+                </script>
             <?php endif; ?>
 
             <!-- Async Loading Placeholder for Stats (only if no cached stats exist) -->
@@ -582,7 +860,7 @@
                 </div>
 
                 <script>
-                    (function () {
+                    (function() {
                         const matchId = <?= (int) $match['id'] ?>;
                         const gameType = '<?= htmlspecialchars($match['game_type']) ?>';
                         const team1Name = '<?= htmlspecialchars(addslashes($match['team1_name'])) ?>';
@@ -633,11 +911,11 @@
                         }
 
                         function renderStats(stats, source, maps, activeMap) {
-                            const sourceBadge = source === 'vlr'
-                                ? '<span class="inline-flex items-center px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-[10px] text-rose-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2 animate-pulse"></span>VLR.gg Stats</span>'
-                                : source === 'hltv'
-                                    ? '<span class="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-[10px] text-orange-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 animate-pulse"></span>HLTV Stats</span>'
-                                    : '<span class="inline-flex items-center px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] text-blue-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span>Liquipedia Stats</span>';
+                            const sourceBadge = source === 'vlr' ?
+                                '<span class="inline-flex items-center px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-[10px] text-rose-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2 animate-pulse"></span>VLR.gg Stats</span>' :
+                                source === 'hltv' ?
+                                '<span class="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-[10px] text-orange-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-2 animate-pulse"></span>HLTV Stats</span>' :
+                                '<span class="inline-flex items-center px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-[10px] text-blue-400 font-bold uppercase tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span>Liquipedia Stats</span>';
 
                             const hasAdvanced = source === 'vlr' || source === 'hltv';
                             const isHltv = source === 'hltv';
@@ -648,9 +926,9 @@
                                 tabsHtml = '<div class="flex flex-wrap justify-center gap-2 mb-6">';
                                 maps.forEach(map => {
                                     const isActive = map === activeMap;
-                                    const activeClass = isActive
-                                        ? 'bg-indigo-600 text-white border-indigo-500'
-                                        : 'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700 hover:text-white';
+                                    const activeClass = isActive ?
+                                        'bg-indigo-600 text-white border-indigo-500' :
+                                        'bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:bg-zinc-700 hover:text-white';
                                     const label = map === 'overall' ? 'All Maps' : map;
                                     tabsHtml += `<button onclick="window.loadMapStats('${escapeHtml(map)}')" class="px-4 py-2 text-xs font-bold uppercase tracking-wider border rounded-lg transition-all ${activeClass}">${escapeHtml(label)}</button>`;
                                 });
@@ -661,9 +939,16 @@
                             html += tabsHtml;
                             html += '<div class="grid grid-cols-1 xl:grid-cols-2 gap-8">';
 
-                            const teams = [
-                                { name: team1Name, players: stats.team1 || [], color: 'indigo' },
-                                { name: team2Name, players: stats.team2 || [], color: 'rose' }
+                            const teams = [{
+                                    name: team1Name,
+                                    players: stats.team1 || [],
+                                    color: 'indigo'
+                                },
+                                {
+                                    name: team2Name,
+                                    players: stats.team2 || [],
+                                    color: 'rose'
+                                }
                             ];
 
                             teams.forEach(team => {

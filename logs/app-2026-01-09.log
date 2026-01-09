@@ -1,0 +1,6 @@
+[2026-01-09T17:24:40.669903+00:00] clutchdata.ERROR: API getMatchStats error {"error":"SQLSTATE[42S22]: Column not found: 1054 Unknown column 'map_name' in 'where clause'"} []
+[2026-01-09T17:24:40.674274+00:00] clutchdata.INFO: API access {"endpoint":"/ClutchData/public/api/match/stats?id=263&map=Haven","method":"GET","status_code":500,"ip":"::1"} []
+[2026-01-09T17:24:52.460694+00:00] clutchdata.ERROR: API getMatchStats error {"error":"SQLSTATE[42S22]: Column not found: 1054 Unknown column 'map_name' in 'where clause'"} []
+[2026-01-09T17:24:52.462048+00:00] clutchdata.INFO: API access {"endpoint":"/ClutchData/public/api/match/stats?id=263&map=Bind","method":"GET","status_code":500,"ip":"::1"} []
+[2026-01-09T17:25:03.327369+00:00] clutchdata.ERROR: API getMatchStats error {"error":"SQLSTATE[42S22]: Column not found: 1054 Unknown column 'map_name' in 'where clause'"} []
+[2026-01-09T17:25:03.328708+00:00] clutchdata.INFO: API access {"endpoint":"/ClutchData/public/api/match/stats?id=263&map=overall","method":"GET","status_code":500,"ip":"::1"} []
