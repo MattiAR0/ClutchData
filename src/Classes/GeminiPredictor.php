@@ -17,7 +17,7 @@ class GeminiPredictor
     private string $apiKey;
     private ?MonologLogger $logger;
     private const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-    private const RATE_LIMIT_DELAY = 1; // segundos entre llamadas
+    private const RATE_LIMIT_DELAY = 4; // segundos entre llamadas (ajustado para Free Tier 15 RPM)
     private const API_TIMEOUT = 60; // segundos de timeout (aumentado para priorizar IA)
     private const MAX_RETRIES = 2; // reintentos si falla
 
@@ -241,6 +241,12 @@ class GeminiPredictor
         if ($error) {
             $this->log('error', "cURL error [{$errno}]: {$error}");
             error_log("[GeminiPredictor] cURL error [{$errno}]: {$error}");
+            return null;
+        }
+
+        if ($httpCode === 429) {
+            $this->log('warning', "Gemini API Rate Limit Hit (429). Cooling down...");
+            // Do not retry immediately to avoid ban
             return null;
         }
 
